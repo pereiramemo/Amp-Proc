@@ -321,7 +321,77 @@ write.csv(x = INPUT_ASV_TABLE_ANNOT, file = OUTPUT_ASV_TABLE)
 print("Output ASV table saved")
 
 ###############################################################################
-### 10. Save R workspace
+### 10. Save session info
+###############################################################################
+
+output_dir <- dirname(OUTPUT_ASV_TABLE)
+filename_session_info <- file.path(output_dir, "session_info_taxa_annot.txt")
+
+sink(filename_session_info)
+
+cat("================================================================================\n")
+cat("Taxa Annotation Pipeline - Session Information\n")
+cat("================================================================================\n")
+cat(sprintf("Date: %s\n\n", Sys.time()))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("INPUT FILES\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("Input ASV table: %s\n", INPUT_ASV_TABLE))
+if (!is.null(INPUT_FASTA) && !TMP_FASTA) {
+  cat(sprintf("Input FASTA file: %s\n", INPUT_FASTA))
+} else {
+  cat("Input FASTA file: Generated from ASV table\n")
+}
+cat("\n")
+
+cat("--------------------------------------------------------------------------------\n")
+cat("PARAMETERS USED\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("Output ASV table: %s\n", OUTPUT_ASV_TABLE))
+cat(sprintf("Annotation method: %s\n", METHOD))
+cat(sprintf("Number of threads (nslots): %d\n", NSLOTS))
+
+if (METHOD %in% c("NBC", "NBCandEM")) {
+  cat(sprintf("Training database: %s\n", TRAIN_DB))
+}
+
+if (METHOD == "NBCandEM") {
+  cat(sprintf("Reference database: %s\n", REF_DB))
+}
+
+if (METHOD == "BLAST") {
+  cat(sprintf("BLAST database: %s\n", BLAST_DB))
+  cat(sprintf("Taxonomy map: %s\n", TAXA_MAP))
+  cat(sprintf("E-value threshold: %s\n", EVALUE))
+  cat(sprintf("Minimum identity: %s%%\n", MIN_IDENTITY))
+}
+
+cat(sprintf("Workspace saved: %s\n\n", SAVE_WORKSPACE))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("PACKAGE VERSIONS\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("R version: %s\n", R.version.string))
+cat(sprintf("dada2: %s\n", packageVersion("dada2")))
+cat(sprintf("tidyverse: %s\n\n", packageVersion("tidyverse")))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("FULL SESSION INFO\n")
+cat("--------------------------------------------------------------------------------\n")
+print(sessionInfo())
+
+cat("\n")
+cat("================================================================================\n")
+cat("END OF SESSION INFO\n")
+cat("================================================================================\n")
+
+sink()
+
+cat(sprintf("Session info saved to: %s\n", filename_session_info))
+
+###############################################################################
+### 11. Save R workspace
 ###############################################################################
 
 if (SAVE_WORKSPACE) {
@@ -332,7 +402,7 @@ if (SAVE_WORKSPACE) {
 }
 
 ###############################################################################
-### 11. Cleanup temporary files
+### 12. Cleanup temporary files
 ###############################################################################
 
 if (TMP_FASTA && file.exists(INPUT_FASTA)) {
