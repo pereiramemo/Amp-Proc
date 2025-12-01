@@ -11,39 +11,138 @@ suppressMessages(suppressWarnings(library(dada2)))
 suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(suppressWarnings(library(ShortRead)))
 
-args = commandArgs(trailingOnly=TRUE)
-
 ###############################################################################
-### 2. Get parameters
+### 2. Parse command line arguments
 ###############################################################################
 
-INPUT_DIR <- args[1]
-OUTPUT_DIR <- args[2]
-PATTERN_R1 <- args[3]
-PATTERN_R2 <- args[4]
-NSLOTS <- args[5] %>% as.numeric
-TRUNC_R1 <- args[6] %>% as.numeric
-TRUNC_R2 <- args[7] %>% as.numeric
-MIN_OVERLAP <- args[8] %>% as.numeric
-BIMERAS_METHOD <- args[9]
-POOL_OPTION <- args[10] %>% as.logical
-QUAL_PLOT <- args[11] %>% as.logical
-ERR_PLOT <- args[12] %>% as.logical
-SAVE_WORKSPACE <- args[13] %>% as.logical
+# Function to display help
+show_usage <- function() {
+  cat("Usage: ./dada2_pipeline.R <options>\n")
+  cat("--help                          print this help\n")
+  cat("--input_dir CHAR                directory with the input raw fastq files (required)\n")
+  cat("--output_dir CHAR               directory to output generated data (required)\n")
+  cat("--nslots NUM                    number of threads used (default: 12)\n")
+  cat("--trunc_r1 NUM                  number of nuc to remove in R1 from the 3' end (default: 250)\n")
+  cat("--trunc_r2 NUM                  number of nuc to remove in R2 from the 3' end (default: 200)\n")
+  cat("--pattern_r1 CHAR               pattern of R1 reads to load fastq files (default: _L001_R1_001.fastq.gz)\n")
+  cat("--pattern_r2 CHAR               pattern of R2 reads to load fastq files (default: _L001_R2_001.fastq.gz)\n")
+  cat("--bimeras_method CHAR           method to check bimeras: pooled, consensus, per-sample (default: consensus)\n")
+  cat("--min_overlap NUM               minimum number of nucleotides to overlap in merging (default: 12)\n")
+  cat("--pooled                        use pooled option when running dada2 (default: TRUE)\n")
+  cat("--no_pooled                     disable pooled option\n")
+  cat("--qual_plot                     create quality plots (default: TRUE)\n")
+  cat("--no_qual_plot                  disable quality plots\n")
+  cat("--err_plot                      create error plots (default: TRUE)\n")
+  cat("--no_err_plot                   disable error plots\n")
+  cat("--save_workspace                save R workspace image (default: TRUE)\n")
+  cat("--no_save_workspace             disable saving workspace\n")
+  cat("--overwrite                     overwrite previous directory (default: FALSE)\n")
+  quit(status = 0)
+}
 
-# INPUT_DIR <- "/home/bioinf/data/indicadores_cuencas_2018/"
-# OUTPUT_DIR <- "/home/epereira/workspace/indicadores_cuencas_2018/output/asv_run0_tmp/"
-# PATTERN_R1 <- "_L001_R1_001.fastq.gz"
-# PATTERN_R2 <- "_L001_R2_001.fastq.gz"
-# NSLOTS <- 12
-# TRUNC_R1 <- 250
-# TRUNC_R2 <- 200
-# MIN_OVERLAP <- 12
-# BIMERAS_METHOD <- "consensus"
-# POOL_OPTION <- TRUE
-# QUAL_PLOT <- T
-# ERR_PLOT <- T
-# SAVE_WORKSPACE <- T
+# Initialize parameters with defaults
+INPUT_DIR <- NULL
+OUTPUT_DIR <- NULL
+NSLOTS <- 12
+TRUNC_R1 <- 250
+TRUNC_R2 <- 200
+PATTERN_R1 <- "_L001_R1_001.fastq.gz"
+PATTERN_R2 <- "_L001_R2_001.fastq.gz"
+MIN_OVERLAP <- 12
+BIMERAS_METHOD <- "consensus"
+POOL_OPTION <- TRUE
+QUAL_PLOT <- TRUE
+ERR_PLOT <- TRUE
+SAVE_WORKSPACE <- TRUE
+OVERWRITE <- FALSE
+
+# Parse arguments
+args <- commandArgs(trailingOnly = TRUE)
+i <- 1
+while (i <= length(args)) {
+  arg <- args[i]
+  
+  if (arg == "--help" || arg == "-h") {
+    show_usage()
+  } else if (arg == "--input_dir") {
+    INPUT_DIR <- args[i + 1]
+    i <- i + 1
+  } else if (arg == "--output_dir") {
+    OUTPUT_DIR <- args[i + 1]
+    i <- i + 1
+  } else if (arg == "--nslots") {
+    NSLOTS <- as.numeric(args[i + 1])
+    i <- i + 1
+  } else if (arg == "--trunc_r1") {
+    TRUNC_R1 <- as.numeric(args[i + 1])
+    i <- i + 1
+  } else if (arg == "--trunc_r2") {
+    TRUNC_R2 <- as.numeric(args[i + 1])
+    i <- i + 1
+  } else if (arg == "--pattern_r1") {
+    PATTERN_R1 <- args[i + 1]
+    i <- i + 1
+  } else if (arg == "--pattern_r2") {
+    PATTERN_R2 <- args[i + 1]
+    i <- i + 1
+  } else if (arg == "--min_overlap") {
+    MIN_OVERLAP <- as.numeric(args[i + 1])
+    i <- i + 1
+  } else if (arg == "--bimeras_method") {
+    BIMERAS_METHOD <- args[i + 1]
+    i <- i + 1
+  } else if (arg == "--pooled") {
+    POOL_OPTION <- TRUE
+  } else if (arg == "--no_pooled") {
+    POOL_OPTION <- FALSE
+  } else if (arg == "--qual_plot") {
+    QUAL_PLOT <- TRUE
+  } else if (arg == "--no_qual_plot") {
+    QUAL_PLOT <- FALSE
+  } else if (arg == "--err_plot") {
+    ERR_PLOT <- TRUE
+  } else if (arg == "--no_err_plot") {
+    ERR_PLOT <- FALSE
+  } else if (arg == "--save_workspace") {
+    SAVE_WORKSPACE <- TRUE
+  } else if (arg == "--no_save_workspace") {
+    SAVE_WORKSPACE <- FALSE
+  } else if (arg == "--overwrite") {
+    OVERWRITE <- TRUE
+  } else {
+    cat(sprintf("Warning: Unknown option '%s'\n", arg))
+  }
+  
+  i <- i + 1
+}
+
+# Validate required parameters
+if (is.null(INPUT_DIR)) {
+  cat("Error: --input_dir is required\n")
+  show_usage()
+}
+
+if (is.null(OUTPUT_DIR)) {
+  cat("Error: --output_dir is required\n")
+  show_usage()
+}
+
+# Check input directory exists
+if (!dir.exists(INPUT_DIR)) {
+  cat(sprintf("Error: Input directory '%s' does not exist\n", INPUT_DIR))
+  quit(status = 1)
+}
+
+# Handle output directory
+if (dir.exists(OUTPUT_DIR)) {
+  if (OVERWRITE) {
+    cat(sprintf("Removing existing output directory: %s\n", OUTPUT_DIR))
+    unlink(OUTPUT_DIR, recursive = TRUE)
+  } else {
+    cat(sprintf("Error: Output directory '%s' already exists. Use --overwrite to overwrite\n", OUTPUT_DIR))
+    quit(status = 1)
+  }
+}
 
 ###############################################################################
 ### 3. Create output dirs

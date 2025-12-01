@@ -1,16 +1,18 @@
 # Amplicon Pipelines
 
-This repo includes pipelines for the preprocessing, clustering and annotation of 16S rRNA sequence data. 
-It additionally provides the scripts to glue the outputs of these pipelines.
+This repo includes pipelines for the preprocessing, clustering and annotation of amplicon sequence data. 
 
-## Requisites 
-[R](https://www.r-project.org) and the folowing R packages:  
-[DADA2](https://benjjneb.github.io/dada2/index.html)  
-[tidyverse](www.tidyverse.org)  
-[ShortRead](https://www.bioconductor.org/packages/release/bioc/html/ShortRead.html)  
-[Biostrings](https://bioconductor.org/packages/release/bioc/html/Biostrings.html)  
+## Installation
 
-Once these tools are installed, the paths to the executables have to be added to the scripts/conf.sh file.
+All dependencies can be installed using [Mamba](https://mamba.readthedocs.io/) (or Conda) with the provided environment file:
+
+```bash
+# Install the environment
+mamba env create -f environment.yml
+
+# Activate the environment
+conda activate metabarcoding-processing-obm
+```
 
 
 
