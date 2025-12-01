@@ -378,7 +378,70 @@ filename_seqlength_stats <- file.path(OUTPUT_DIR,"tables/seq_length_stats.csv")
 write.csv(file = filename_seqlength_stats, track_mergers_length_stats)
 
 ###############################################################################
-### 20. Save R workspace
+### 20. Save session info
+###############################################################################
+
+filename_session_info <- file.path(OUTPUT_DIR, "session_info.txt")
+
+sink(filename_session_info)
+
+cat("================================================================================\n")
+cat("DADA2 Pipeline - Session Information\n")
+cat("================================================================================\n")
+cat(sprintf("Date: %s\n\n", Sys.time()))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("INPUT FILES\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("Input directory: %s\n", INPUT_DIR))
+cat(sprintf("Number of sample pairs: %d\n", length(rawR1)))
+cat(sprintf("Pattern R1: %s\n", PATTERN_R1))
+cat(sprintf("Pattern R2: %s\n\n", PATTERN_R2))
+
+cat("Sample files:\n")
+for (i in 1:length(sample.names)) {
+  cat(sprintf("  %d. %s\n", i, sample.names[i]))
+}
+cat("\n")
+
+cat("--------------------------------------------------------------------------------\n")
+cat("PARAMETERS USED\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("Output directory: %s\n", OUTPUT_DIR))
+cat(sprintf("Number of threads (nslots): %d\n", NSLOTS))
+cat(sprintf("Truncation length R1: %d\n", TRUNC_R1))
+cat(sprintf("Truncation length R2: %d\n", TRUNC_R2))
+cat(sprintf("Minimum overlap for merging: %d\n", MIN_OVERLAP))
+cat(sprintf("Bimeras detection method: %s\n", BIMERAS_METHOD))
+cat(sprintf("Pooled option: %s\n", POOL_OPTION))
+cat(sprintf("Quality plots generated: %s\n", QUAL_PLOT))
+cat(sprintf("Error plots generated: %s\n", ERR_PLOT))
+cat(sprintf("Workspace saved: %s\n\n", SAVE_WORKSPACE))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("PACKAGE VERSIONS\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("R version: %s\n", R.version.string))
+cat(sprintf("dada2: %s\n", packageVersion("dada2")))
+cat(sprintf("tidyverse: %s\n", packageVersion("tidyverse")))
+cat(sprintf("ShortRead: %s\n\n", packageVersion("ShortRead")))
+
+cat("--------------------------------------------------------------------------------\n")
+cat("FULL SESSION INFO\n")
+cat("--------------------------------------------------------------------------------\n")
+print(sessionInfo())
+
+cat("\n")
+cat("================================================================================\n")
+cat("END OF SESSION INFO\n")
+cat("================================================================================\n")
+
+sink()
+
+cat(sprintf("Session info saved to: %s\n", filename_session_info))
+
+###############################################################################
+### 21. Save R workspace
 ###############################################################################
 
 if (SAVE_WORKSPACE == T) {
