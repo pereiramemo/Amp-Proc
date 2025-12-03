@@ -18,6 +18,7 @@ dependencies:
   
   # Bioinformatics tools
   - cutadapt
+  - fastp
   
   # BLAST for taxonomic annotation
   - blast

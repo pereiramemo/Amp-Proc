@@ -72,7 +72,8 @@ conda activate metabarcoding-processing-obm
 
 The output consists of:
 
-- CSV file with primer detection percentages (or counts) for each orientation per sample
+- `<sample_name>_primer_check.csv`: CSV file with primer detection percentages (or counts) for each orientation per sample. Columns include primer orientation combinations (e.g., FwdReads.FwdPrimer.Forward, RevReads.RevPrimer.ReverseComplement)
+- `primer_sequences.csv`: CSV file listing the primer sequences in all four orientations (Forward, Complement, Reverse, ReverseComplement) for both forward and reverse primers
 - Helps determine if primer removal is needed before downstream processing
 
 To see the help run `python scripts/check_primers.py --help`
