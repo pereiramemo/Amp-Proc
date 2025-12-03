@@ -9,8 +9,6 @@ This repository contains scripts for quality checking, preprocessing, clustering
 ├── LICENSE                                # License file
 ├── README.md                              # This file
 ├── environment.yml                        # Conda/Mamba environment specification
-├── documentation/                         # Additional documentation
-│   └── documentation.md                   # Detailed pipeline documentation
 └── modules/                               # Main analysis scripts
     ├── 1.1-quality_check_fastp.sh         # Quality check with fastp
     ├── 1.2-check_primers.py               # Primer checking utility
