@@ -6,22 +6,25 @@ channels:
 dependencies:
   # R and core packages
   - r-base>=4.0
-  
+
   # Bioconductor packages
   - bioconductor-dada2
   - bioconductor-shortread
   - bioconductor-biostrings
-  
+
   # R packages from conda-forge
   - r-tidyverse
   - tbb=2020.2  # Required for dada2 compatibility
-  
+
+  # Python packages
+  - biopython
+
   # Bioinformatics tools
   - cutadapt
   - fastp
-  
+
   # BLAST for taxonomic annotation
   - blast
-  
+
   # Compression utilities
   - pigz

@@ -266,6 +266,8 @@ for i in "${!R1_FILES[@]}"; do
     
     log "Processing sample ${SAMPLE_NAME} ($(( i + 1 ))/${#R1_FILES[@]})..."
     
+    echo $R1
+    echo $R2
     # Define output files
     HTML_OUT="${OUTPUT_DIR}/reports/${SAMPLE_NAME}_fastp.html"
     JSON_OUT="${OUTPUT_DIR}/reports/${SAMPLE_NAME}_fastp.json"
@@ -301,16 +303,25 @@ for i in "${!R1_FILES[@]}"; do
     fi
     
     # Don't output processed reads (report only mode)
+    # Create temporary files for outputs
+    TEMP_OUT_R1="${OUTPUT_DIR}/reports/${SAMPLE_NAME}_temp_R1.fastq.gz"
+    TEMP_OUT_R2="${OUTPUT_DIR}/reports/${SAMPLE_NAME}_temp_R2.fastq.gz"
+
     FASTP_CMD+=(
-        -o /dev/null
-        -O /dev/null
+        -o "${TEMP_OUT_R1}"
+        -O "${TEMP_OUT_R2}"
     )
-    
+
     # Run fastp
     if ! "${FASTP_CMD[@]}" 2>&1 | tee "${OUTPUT_DIR}/reports/${SAMPLE_NAME}_fastp.log"; then
         log_error "fastp failed for sample ${SAMPLE_NAME}"
+        # Clean up temporary files on failure
+        rm -f "${TEMP_OUT_R1}" "${TEMP_OUT_R2}"
         exit 1
     fi
+
+    # Remove temporary output files after successful completion
+    rm -f "${TEMP_OUT_R1}" "${TEMP_OUT_R2}"
     
     # Extract summary statistics from JSON if available
     if [[ "${JSON_REPORT}" == "t" && -f "${JSON_OUT}" ]]; then

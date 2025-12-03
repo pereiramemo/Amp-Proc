@@ -318,25 +318,30 @@ Usage: ./taxa_annot.R <options>
 ## Complete workflow example
 
 ```bash
+# Set input directory
+INPUT_DIR=inbox/Saenz/CEHUM/demultiplexed_CEHUM/fish
+PRIMER_FWD="GACCCTATGGAGCTTTAGAC"
+PRIMER_REV="CGCTGTTATCCCTADRGTAACT"
+
 # Step 1: Quality check (optional but recommended)
 bash modules/1.1-quality_check_fastp.sh \
-  --input_dir=raw_data/ \
+  --input_dir=${INPUT_DIR} \
   --output_dir=results/qc_reports \
   --nslots=16 \
   --overwrite=t
 
 # Step 2: Check primers (optional but recommended)
 python modules/1.2-check_primers.py \
-  --input_dir raw_data/ \
+  --input_dir ${INPUT_DIR} \
   --output_dir results/primer_check \
   --suffix_r1 _R1_001.fastq.gz \
   --suffix_r2 _R2_001.fastq.gz \
-  --primer_fwd GTGYCAGCMGCCGCGGTAA \
-  --primer_rev CCGYCAATTYMTTTRAGTTT
+  --primer_fwd "${PRIMER_FWD} \
+  --primer_rev "${PRIMER_REV}"
 
 # Step 3: Remove primers
 bash modules/1.3-primer_removal_cutadapt.sh \
-  --input_dir=raw_data/ \
+  --input_dir=${INPUT_DIR} \
   --output_dir=results/trimmed \
   --primer_fwd=GTGYCAGCMGCCGCGGTAA \
   --primer_rev=CCGYCAATTYMTTTRAGTTT \
