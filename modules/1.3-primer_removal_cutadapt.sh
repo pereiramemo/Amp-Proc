@@ -360,7 +360,7 @@ for i in "${!R1_FILES[@]}"; do
     
     # Calculate percent trimmed
     if [[ -n "${TOTAL_PAIRS}" && -n "${PAIRS_WRITTEN}" && ${TOTAL_PAIRS} -gt 0 ]]; then
-        PERCENT_TRIMMED=$(awk "BEGIN {printf \"%.2f\", (${PAIRS_WRITTEN}/${TOTAL_PAIRS})*100}")
+        PERCENT_TRIMMED=$(awk -v pairs="${PAIRS_WRITTEN}" -v total="${TOTAL_PAIRS}" 'BEGIN {printf "%.2f", (pairs/total)*100}')
     else
         PERCENT_TRIMMED="0.00"
     fi
