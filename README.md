@@ -1,6 +1,6 @@
-# Amplicon Pipelines
+# Metabarcoding Processing Pipelines
 
-This repository contains scripts for preprocessing, clustering, and taxonomic annotation of amplicon sequencing data. The pipelines include: `1.1-quality_check_fastp.sh`, `1.2-check_primers.py`, `1.3-primer_removal_cutadapt.sh`, `2-dada2_pipeline.R`, and `3-taxa_annot.R`, written in Bash, Python, and R.
+This repository contains scripts for quality checking, preprocessing, clustering, and taxonomic annotation of amplicon sequencing data. The pipelines include: `1.1-quality_check_fastp.sh`, `1.2-check_primers.py`, `1.3-primer_removal_cutadapt.sh`, `2-dada2_pipeline.R`, and `3-taxa_annot.R`, written in Bash, Python, and R.
 
 ## Repository structure
 
