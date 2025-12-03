@@ -1,4 +1,4 @@
-# Metabarcoding Processing Pipelines
+# Amplicon Processing Pipelines
 
 This repository contains scripts for quality checking, preprocessing, clustering, and taxonomic annotation of amplicon sequencing data. The pipelines include: `1.1-quality_check_fastp.sh`, `1.2-check_primers.py`, `1.3-primer_removal_cutadapt.sh`, `2-dada2_pipeline.R`, and `3-taxa_annot.R`, written in Bash, Python, and R.
 
@@ -383,7 +383,7 @@ Rscript modules/3-taxa_annot.R \
 
 This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details.
 
-Copyright (C) 2025 Ocean BioMetrics
+Copyright (C) 2025 Emiliano Pereira
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
