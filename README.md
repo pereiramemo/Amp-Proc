@@ -336,23 +336,25 @@ python modules/1.2-check_primers.py \
   --output_dir results/primer_check \
   --suffix_r1 _R1_001.fastq.gz \
   --suffix_r2 _R2_001.fastq.gz \
-  --primer_fwd "${PRIMER_FWD} \
+  --primer_fwd "${PRIMER_FWD}" \
   --primer_rev "${PRIMER_REV}"
 
 # Step 3: Remove primers
 bash modules/1.3-primer_removal_cutadapt.sh \
-  --input_dir=${INPUT_DIR} \
-  --output_dir=results/trimmed \
-  --primer_fwd=GTGYCAGCMGCCGCGGTAA \
-  --primer_rev=CCGYCAATTYMTTTRAGTTT \
+  --input_dir ${INPUT_DIR} \
+  --output_dir results/cutadapt \
+  --primer_fwd "${PRIMER_FWD}" \
+  --primer_rev  "${PRIMER_REV}" \
   --nslots=16 \
   --overwrite=t
 
 # Step 4: Generate ASVs
 Rscript modules/2-dada2_pipeline.R \
-  --input_dir results/trimmed/trimmed/ \
+  --input_dir results/cutadapt/trimmed/ \
   --output_dir results/asvs \
   --nslots 16 \
+  --pattern_r1 _R1_trimmed.fastq.gz \
+  --pattern_r2 _R2_trimmed.fastq.gz \
   --overwrite
 
 # Step 5: Annotate taxonomy
