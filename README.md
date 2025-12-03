@@ -1,22 +1,24 @@
 # Amplicon Pipelines
 
-This repository contains scripts for preprocessing, clustering, and taxonomic annotation of amplicon sequencing data. The pipelines include: `check_primers.py`, `dada2_pipeline.R`, and `taxa_annot.R`, written in Python and R, respectively.
+This repository contains scripts for preprocessing, clustering, and taxonomic annotation of amplicon sequencing data. The pipelines include: `1.1-quality_check_fastp.sh`, `1.2-check_primers.py`, `1.3-primer_removal_cutadapt.sh`, `2-dada2_pipeline.R`, and `3-taxa_annot.R`, written in Bash, Python, and R.
 
 ## Repository structure
 
 ```
 .
-├── LICENSE                 # License file
-├── README.md               # This file
-├── environment.yml         # Conda/Mamba environment specification
-├── documentation/          # Additional documentation
-│   └── documentation.md    # Detailed pipeline documentation
-└── modules/                # Main analysis scripts
-    ├── check_primers.py    # Primer checking utility
-    ├── dada2_pipeline.R    # DADA2 ASV generation pipeline
-    ├── taxa_annot.R        # Taxonomic annotation pipeline
-    ├── toolbox.R           # Utility functions
-    └── conf.sh             # Configuration file
+├── LICENSE                                # License file
+├── README.md                              # This file
+├── environment.yml                        # Conda/Mamba environment specification
+├── documentation/                         # Additional documentation
+│   └── documentation.md                   # Detailed pipeline documentation
+└── modules/                               # Main analysis scripts
+    ├── 1.1-quality_check_fastp.sh         # Quality check with fastp
+    ├── 1.2-check_primers.py               # Primer checking utility
+    ├── 1.3-primer_removal_cutadapt.sh     # Primer removal with cutadapt
+    ├── 2-dada2_pipeline.R                 # DADA2 ASV generation pipeline
+    ├── 3-taxa_annot.R                     # Taxonomic annotation pipeline
+    ├── toolbox.R                          # Utility functions
+    └── conf.sh                            # Configuration file
 ```
 
 ## Installation instructions
@@ -61,9 +63,60 @@ conda activate metabarcoding-processing-obm
 
 ## How to use
 
-### check_primers.py
+### 1.1-quality_check_fastp.sh
 
-**check_primers.py**: This Python script checks for primer presence in FASTQ files with support for IUPAC ambiguity codes. The main tasks include:
+**1.1-quality_check_fastp.sh**: This Bash script generates quality control reports for paired-end FASTQ files using fastp. The main tasks include:
+
+- Analyzing read quality metrics for R1 and R2 reads
+- Generating comprehensive HTML and JSON reports
+- Computing statistics on base quality, read counts, and filtering metrics
+- Running in report-only mode (no reads are modified)
+
+The output consists of:
+
+- `<sample_name>_fastp.html`: Interactive HTML report with quality plots and statistics
+- `<sample_name>_fastp.json`: JSON format report with detailed metrics
+- `<sample_name>_fastp.log`: Processing log file
+- `summary.tsv`: Summary statistics table for all samples
+- `summary_report.txt`: Human-readable summary report
+
+To see the help run `bash modules/1.1-quality_check_fastp.sh --help`
+
+```
+Usage: 1.1-quality_check_fastp.sh <options>
+
+Options:
+    --help
+        Print this help message and exit
+
+    --input_dir=CHAR
+        Directory containing input FASTQ files (required)
+
+    --output_dir=CHAR
+        Directory to output generated data (QC reports and plots) (required)
+
+    --pattern_r1=CHAR
+        Pattern for R1 FASTQ files [default=_R1_001.fastq.gz]
+
+    --pattern_r2=CHAR
+        Pattern for R2 FASTQ files [default=_R2_001.fastq.gz]
+
+    --nslots=NUM
+        Number of threads to use [default=12]
+
+    --html_report=t|f
+        Generate HTML report [default=t]
+
+    --json_report=t|f
+        Generate JSON report [default=t]
+
+    --overwrite=t|f
+        Overwrite previous directory [default=f]
+```
+
+### 1.2-check_primers.py
+
+**1.2-check_primers.py**: This Python script checks for primer presence in FASTQ files with support for IUPAC ambiguity codes. The main tasks include:
 
 - Subsampling reads from paired-end FASTQ files
 - Detecting primers in all orientations (forward, complement, reverse, reverse-complement)
@@ -76,7 +129,7 @@ The output consists of:
 - `primer_sequences.csv`: CSV file listing the primer sequences in all four orientations (Forward, Complement, Reverse, ReverseComplement) for both forward and reverse primers
 - Helps determine if primer removal is needed before downstream processing
 
-To see the help run `python scripts/check_primers.py --help`
+To see the help run `python modules/1.2-check_primers.py --help`
 
 ```
 usage: check_primers.py [-h] -i INPUT_DIR -o OUTPUT_DIR --suffix_r1 SUFFIX_R1 
@@ -104,9 +157,77 @@ options:
   --counts              Write raw counts instead of percentages (default: percentages)
 ```
 
-### dada2_pipeline.R
+### 1.3-primer_removal_cutadapt.sh
 
-**dada2_pipeline.R**: This R pipeline processes raw Illumina paired-end reads from amplicon sequencing samples and generates Amplicon Sequence Variants (ASVs) using the DADA2 algorithm. The main tasks include:
+**1.3-primer_removal_cutadapt.sh**: This Bash script removes primer sequences from paired-end FASTQ files using cutadapt. The main tasks include:
+
+- Trimming forward primers from R1 reads
+- Trimming reverse primers (reverse complement) from R2 reads
+- Filtering reads by minimum length after trimming
+- Support for IUPAC ambiguity codes in primers
+- Optional discarding of reads without detected primers
+- Computing trimming statistics
+
+The output consists of:
+
+- `<sample_name>_R1_trimmed.fastq.gz`: Trimmed R1 reads (optionally compressed)
+- `<sample_name>_R2_trimmed.fastq.gz`: Trimmed R2 reads (optionally compressed)
+- `<sample_name>_cutadapt.log`: Detailed cutadapt log per sample
+- `summary.tsv`: Summary statistics table for all samples
+- `summary_report.txt`: Human-readable summary report with primer sequences and parameters
+
+To see the help run `bash modules/1.3-primer_removal_cutadapt.sh --help`
+
+```
+Usage: 1.3-primer_removal_cutadapt.sh <options>
+
+Options:
+    --help
+        Print this help message and exit
+
+    --input_dir=CHAR
+        Directory containing input FASTQ files (required)
+
+    --output_dir=CHAR
+        Directory to output trimmed FASTQ files (required)
+
+    --pattern_r1=CHAR
+        Pattern for R1 FASTQ files [default=_R1_001.fastq.gz]
+
+    --pattern_r2=CHAR
+        Pattern for R2 FASTQ files [default=_R2_001.fastq.gz]
+
+    --primer_fwd=CHAR
+        Forward primer sequence (5' to 3') (required)
+
+    --primer_rev=CHAR
+        Reverse primer sequence (5' to 3') (required)
+
+    --nslots=NUM
+        Number of threads to use [default=12]
+
+    --error_rate=NUM
+        Maximum allowed error rate (mismatches/length) [default=0.1]
+
+    --min_overlap=NUM
+        Minimum overlap between primer and read [default=3]
+
+    --min_length=NUM
+        Discard reads shorter than this after trimming [default=50]
+
+    --discard_untrimmed=t|f
+        Discard reads where no primer was found [default=f]
+
+    --compress=t|f
+        Compress output files with gzip [default=t]
+
+    --overwrite=t|f
+        Overwrite previous directory [default=f]
+```
+
+### 2-dada2_pipeline.R
+
+**2-dada2_pipeline.R**: This R pipeline processes raw Illumina paired-end reads from amplicon sequencing samples and generates Amplicon Sequence Variants (ASVs) using the DADA2 algorithm. The main tasks include:
 
 - Quality filtering and trimming of paired-end reads
 - Learning error rates from the data
@@ -127,7 +248,7 @@ The output consists of:
 - `tables/seq_length_stats.csv`: Table with length statistics (mean, sd, min, max) per sample
 - `tables/session_info.txt`: Complete session information including input files, parameters used, and package versions
 
-To see the help run `Rscript scripts/dada2_pipeline.R --help`
+To see the help run `Rscript modules/2-dada2_pipeline.R --help`
 
 ```
 Usage: ./dada2_pipeline.R <options>
@@ -152,9 +273,9 @@ Usage: ./dada2_pipeline.R <options>
 --overwrite                     overwrite previous directory (default: FALSE)
 ```
 
-### taxa_annot.R
+### 3-taxa_annot.R
 
-**taxa_annot.R**: This R script assigns taxonomy to ASVs generated by the DADA2 pipeline. It supports three annotation methods:
+**3-taxa_annot.R**: This R script assigns taxonomy to ASVs generated by the DADA2 pipeline. It supports three annotation methods:
 
 - **NBC (Naive Bayes Classifier)**: Uses a trained classifier on a reference database
 - **NBCandEM (NBC + Exact Matching)**: Combines NBC with exact matching for species-level assignment
@@ -174,7 +295,7 @@ The output consists of:
   - For BLAST: includes best hit information (accession, organism name, taxonomy path, percent identity)
 - `session_info_taxa_annot.txt`: Session information including input files, parameters used, and package versions
 
-To see the help run `Rscript scripts/taxa_annot.R --help`
+To see the help run `Rscript modules/3-taxa_annot.R --help`
 
 ```
 Usage: ./taxa_annot.R <options>
@@ -199,8 +320,15 @@ Usage: ./taxa_annot.R <options>
 ## Complete workflow example
 
 ```bash
-# Step 1: Check primers (optional but recommended)
-python scripts/check_primers.py \
+# Step 1: Quality check (optional but recommended)
+bash modules/1.1-quality_check_fastp.sh \
+  --input_dir=raw_data/ \
+  --output_dir=results/qc_reports \
+  --nslots=16 \
+  --overwrite=t
+
+# Step 2: Check primers (optional but recommended)
+python modules/1.2-check_primers.py \
   --input_dir raw_data/ \
   --output_dir results/primer_check \
   --suffix_r1 _R1_001.fastq.gz \
@@ -208,15 +336,24 @@ python scripts/check_primers.py \
   --primer_fwd GTGYCAGCMGCCGCGGTAA \
   --primer_rev CCGYCAATTYMTTTRAGTTT
 
-# Step 2: Generate ASVs
-Rscript scripts/dada2_pipeline.R \
-  --input_dir raw_data/ \
+# Step 3: Remove primers
+bash modules/1.3-primer_removal_cutadapt.sh \
+  --input_dir=raw_data/ \
+  --output_dir=results/trimmed \
+  --primer_fwd=GTGYCAGCMGCCGCGGTAA \
+  --primer_rev=CCGYCAATTYMTTTRAGTTT \
+  --nslots=16 \
+  --overwrite=t
+
+# Step 4: Generate ASVs
+Rscript modules/2-dada2_pipeline.R \
+  --input_dir results/trimmed/trimmed/ \
   --output_dir results/asvs \
   --nslots 16 \
   --overwrite
 
-# Step 3: Annotate taxonomy
-Rscript scripts/taxa_annot.R \
+# Step 5: Annotate taxonomy
+Rscript modules/3-taxa_annot.R \
   --input_asv_table results/asvs/asv_table.csv \
   --output_asv_table results/asv_table_annotated.csv \
   --method NBC \
@@ -229,11 +366,12 @@ Rscript scripts/taxa_annot.R \
 - [Python 3](https://www.python.org/)
 - [BioPython](https://biopython.org/)
 - [R](https://www.r-project.org/)
+- [fastp](https://github.com/OpenGene/fastp) (for quality control)
+- [cutadapt](https://cutadapt.readthedocs.io/) (for primer removal)
 - [DADA2](https://benjjneb.github.io/dada2/) R/Bioconductor package
 - [tidyverse](https://www.tidyverse.org/) R package
 - [ShortRead](https://bioconductor.org/packages/release/bioc/html/ShortRead.html) R/Bioconductor package
 - [Biostrings](https://bioconductor.org/packages/release/bioc/html/Biostrings.html) R/Bioconductor package
-- [cutadapt](https://cutadapt.readthedocs.io/) (optional, for primer removal)
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download) (for BLAST-based annotation)
 
 ## License
