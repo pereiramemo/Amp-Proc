@@ -255,7 +255,7 @@ log "Found ${#R1_FILES[@]} sample pairs"
 ###############################################################################
 
 SUMMARY_FILE="${OUTPUT_DIR}/stats/summary.tsv"
-echo -e "sample\ttotal_reads_before\ttotal_bases_before\tq20_bases_before\tq30_bases_before\ttotal_reads_after\ttotal_bases_after\tq20_bases_after\tq30_bases_after\tpercent_passed" > "${SUMMARY_FILE}"
+echo -e "sample\ttotal_reads\ttotal_bases\tq20_bases\tq20_pct\tq30_bases\tq30_pct" > "${SUMMARY_FILE}"
 
 for i in "${!R1_FILES[@]}"; do
     R1="${R1_FILES[$i]}"
@@ -290,12 +290,8 @@ for i in "${!R1_FILES[@]}"; do
         FASTP_CMD+=(--html /dev/null)
     fi
     
-    # Add JSON report if requested
-    if [[ "${JSON_REPORT}" == "t" ]]; then
-        FASTP_CMD+=(--json "${JSON_OUT}")
-    else
-        FASTP_CMD+=(--json /dev/null)
-    fi
+    # Always write JSON so stats can be extracted for the summary TSV
+    FASTP_CMD+=(--json "${JSON_OUT}")
     
     # Disable adapter trimming if requested
     if [[ "${DISABLE_ADAPTER_TRIMMING}" == "t" ]]; then
@@ -323,28 +319,19 @@ for i in "${!R1_FILES[@]}"; do
     # Remove temporary output files after successful completion
     rm -f "${TEMP_OUT_R1}" "${TEMP_OUT_R2}"
     
-    # Extract summary statistics from JSON if available
-    if [[ "${JSON_REPORT}" == "t" && -f "${JSON_OUT}" ]]; then
-        # Parse JSON using basic tools
-        TOTAL_READS_BEFORE=$(grep -Po '"total_reads":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
-        TOTAL_BASES_BEFORE=$(grep -Po '"total_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
-        Q20_BASES_BEFORE=$(grep -Po '"q20_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
-        Q30_BASES_BEFORE=$(grep -Po '"q30_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
-        
-        TOTAL_READS_AFTER=$(grep -Po '"total_reads":\s*\K[0-9]+' "${JSON_OUT}" | tail -1)
-        TOTAL_BASES_AFTER=$(grep -Po '"total_bases":\s*\K[0-9]+' "${JSON_OUT}" | tail -1)
-        Q20_BASES_AFTER=$(grep -Po '"q20_bases":\s*\K[0-9]+' "${JSON_OUT}" | tail -1)
-        Q30_BASES_AFTER=$(grep -Po '"q30_bases":\s*\K[0-9]+' "${JSON_OUT}" | tail -1)
-        
-        # Calculate percent passed
-        if [[ ${TOTAL_READS_BEFORE} -gt 0 ]]; then
-            PERCENT_PASSED=$(awk "BEGIN {printf \"%.2f\", (${TOTAL_READS_AFTER}/${TOTAL_READS_BEFORE})*100}")
-        else
-            PERCENT_PASSED="0.00"
-        fi
-        
-        # Write to summary file
-        echo -e "${SAMPLE_NAME}\t${TOTAL_READS_BEFORE}\t${TOTAL_BASES_BEFORE}\t${Q20_BASES_BEFORE}\t${Q30_BASES_BEFORE}\t${TOTAL_READS_AFTER}\t${TOTAL_BASES_AFTER}\t${Q20_BASES_AFTER}\t${Q30_BASES_AFTER}\t${PERCENT_PASSED}" >> "${SUMMARY_FILE}"
+    # Extract summary statistics from JSON
+    TOTAL_READS=$(grep -Po '"total_reads":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
+    TOTAL_BASES=$(grep -Po '"total_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
+    Q20_BASES=$(grep -Po '"q20_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
+    Q30_BASES=$(grep -Po '"q30_bases":\s*\K[0-9]+' "${JSON_OUT}" | head -1)
+
+    Q20_PCT=$(awk -v q="${Q20_BASES}" -v t="${TOTAL_BASES}" 'BEGIN {printf "%.2f", (t > 0) ? (q/t)*100 : 0}')
+    Q30_PCT=$(awk -v q="${Q30_BASES}" -v t="${TOTAL_BASES}" 'BEGIN {printf "%.2f", (t > 0) ? (q/t)*100 : 0}')
+
+    echo -e "${SAMPLE_NAME}\t${TOTAL_READS}\t${TOTAL_BASES}\t${Q20_BASES}\t${Q20_PCT}\t${Q30_BASES}\t${Q30_PCT}" >> "${SUMMARY_FILE}"
+
+    if [[ "${JSON_REPORT}" != "t" ]]; then
+        rm -f "${JSON_OUT}"
     fi
     
     log "Completed processing ${SAMPLE_NAME}"
