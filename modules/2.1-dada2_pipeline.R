@@ -54,6 +54,12 @@ err_plot <- TRUE
 save_workspace <- TRUE
 overwrite <- FALSE
 
+# Dev only
+input_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/trimmed" # nolintr
+output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.1-dada2_pipeline_output/" # nolintr
+pattern_r1 <- "_L001_R1_trimmed.fastq.gz" # nolintr
+pattern_r2 <- "_L001_R2_trimmed.fastq.gz" # nolintr
+
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1
 while (i <= length(args)) {
@@ -197,8 +203,10 @@ names(filt_r1) <- sample_names
 names(filt_r2) <- sample_names
 
 filter_and_trim_log <- filterAndTrim(
-  fwd = raw_r1, filt = filt_r1,
-  rev = raw_r2, filt.rev = filt_r2,
+  fwd = raw_r1, 
+  filt = filt_r1,
+  rev = raw_r2, 
+  filt.rev = filt_r2,
   truncLen = c(trunc_r1, trunc_r2),
   maxN = 0, maxEE = c(2, 2), truncQ = 2, rm.phix = TRUE,
   compress = TRUE,
@@ -237,17 +245,18 @@ if (err_plot) {
 ### 9. Dereplicate
 ###############################################################################
 
-derep_r1 <- derepFastq(filt_r1, verbose = TRUE)
-derep_r2 <- derepFastq(filt_r2, verbose = TRUE)
+# This step is deliberaly skept, since dereplication is done internally by the dada() function. # nolintr
+# derep_r1 <- derepFastq(filt_r1, verbose = TRUE) # nolintr
+# derep_r2 <- derepFastq(filt_r2, verbose = TRUE) # nolintr
 
 ###############################################################################
 ### 10. Apply sample inference algorithms
 ###############################################################################
 
 print("Finding ASVs ...")
-dada_r1 <- dada(derep_r1, err = err_r1, multithread = nslots,
+dada_r1 <- dada(filt_r1, err = err_r1, multithread = nslots,
   pool = pool_option)
-dada_r2 <- dada(derep_r2, err = err_r2, multithread = nslots,
+dada_r2 <- dada(filt_r2, err = err_r2, multithread = nslots,
   pool = pool_option)
 
 ###############################################################################
@@ -263,7 +272,8 @@ mergers <- mergePairs(
 )
 # The output is a list of data.frames from each sample.
 # Each data.frame contains the merged $sequence, its $abundance,
-# and the indices of the $forward and $reverse sequence variants that were merged.
+# and the indices of the $forward and $reverse sequence variants that were
+# merged.
 
 ###############################################################################
 ### 12. Construct sequence table
