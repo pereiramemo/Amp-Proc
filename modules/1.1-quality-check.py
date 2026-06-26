@@ -14,12 +14,13 @@ from datetime import datetime
 from pathlib import Path
 
 # DEV ONLY — comment out before production use
-# reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
-# reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
-# output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/01_fastp/sample1"
-# nslots = 4
-# overwrite = True
-
+""" reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
+output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/01_fastp/sample1"
+nslots = 4
+disable_adapter_trimming = True
+overwrite = True
+ """
 ################################################################################
 # 2. Define Functions
 ################################################################################
@@ -50,7 +51,6 @@ def log_warn(msg):
 
 def log_error(msg):
     print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
 
 def derive_sample_name(reads1: str) -> str:
     name = Path(reads1).name
@@ -165,7 +165,7 @@ def main():
         q20_bases, q20_rate, q30_bases, q30_rate,
         r1_mean_length, r2_mean_length, gc_content,
     ])
-    summary_file.write_text(header + "\n" + row + "\n")
+    
 
     if not json_report:
         json_out.unlink(missing_ok=True)
@@ -214,12 +214,9 @@ def main():
     )
 
     summary_txt.write_text(report)
-    print(report)
-
+    # print(report) 
     log("\033[0;32m1.1-quality-check.py completed successfully\033[0m")
-    log(f"Reports available in: {reports_dir}")
-    log(f"Summary statistics: {summary_file}")
-
+    
 ################################################################################
 # 3. Execute main function
 ################################################################################

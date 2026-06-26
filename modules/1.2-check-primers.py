@@ -5,27 +5,43 @@
 ################################################################################
 
 import argparse
+import csv
+import gzip
 import os
 import re
 import random
-import csv
-import gzip
+import sys
+from datetime import datetime
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Data import IUPACData
 
 # DEV ONLY — comment out before production use
-# reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
-# reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
-# output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/02_check_primers_before/sample1"
-# primer_fwd = "GTGYCAGCMGCCGCGGTAA"
-# primer_rev = "CCGYCAATTYMTTTRAGTTT"
-# subsample_size = 100
-
+""" reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
+output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/02_check_primers_before/sample1"
+primer_fwd = "GTGYCAGCMGCCGCGGTAA"
+primer_rev = "CCGYCAATTYMTTTRAGTTT"
+subsample_size = 100
+ """
 ################################################################################
 # 2. Define functions
 ################################################################################
+
+def log(msg):
+    print(f"[INFO] {msg}")
+
+def log_error(msg):
+    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+
+
+def fmt_tsv(rows):
+    col_w = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    return "\n".join(
+        "  ".join(r[i].ljust(col_w[i]) for i in range(len(r))) for r in rows
+    )
+
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -110,9 +126,11 @@ def main():
 
     # Validate input files
     if not os.path.isfile(reads1):
-        raise ValueError(f"R1 file does not exist: '{reads1}'")
+        log_error(f"R1 file does not exist: {reads1}")
+        sys.exit(1)
     if not os.path.isfile(reads2):
-        raise ValueError(f"R2 file does not exist: '{reads2}'")
+        log_error(f"R2 file does not exist: {reads2}")
+        sys.exit(1)
 
     # Derive sample name from R1 filename
     sample_name = Path(reads1).name
@@ -142,8 +160,10 @@ def main():
         seqs2 = list(SeqIO.parse(handle, "fastq"))
 
     if len(seqs1) > subsample_size:
+        random.seed(123)
         seqs1 = random.sample(seqs1, subsample_size)
     if len(seqs2) > subsample_size:
+        random.seed(123)
         seqs2 = random.sample(seqs2, subsample_size)
 
     # Count primer hits
@@ -169,9 +189,63 @@ def main():
 
     if raw_counts:
         write_table(hit_counts, output_file)
+        display_vals = hit_counts
     else:
         perc = {k: round(v / subsample_size * 100, 2) for k, v in hit_counts.items()}
         write_table(perc, output_file)
+        display_vals = perc
+
+    ###########################################################################
+    # Summary report
+    ###########################################################################
+
+    log("Generating summary report...")
+
+    # Key orientations: expected signal in a well-prepared library
+    key_keys = [
+        "FwdReads.FwdPrimer.Forward",
+        "FwdReads.RevPrimer.RevComp",
+        "RevReads.RevPrimer.Forward",
+        "RevReads.FwdPrimer.RevComp",
+    ]
+    unit = "counts" if raw_counts else "%"
+    stat_rows = [["orientation", unit]] + [
+        [k, str(display_vals[k])] for k in key_keys if k in display_vals
+    ]
+
+    summary_txt = output_dir_path / "summary_report.txt"
+    report = (
+        f"{'=' * 80}\n"
+        f"Primer Check Report\n"
+        f"{'=' * 80}\n"
+        f"Date:             {datetime.now()}\n"
+        f"Sample:           {sample_name}\n"
+        f"R1:               {reads1}\n"
+        f"R2:               {reads2}\n"
+        f"Output directory: {output_dir}\n"
+        f"\n"
+        f"Parameters:\n"
+        f"-----------\n"
+        f"  Forward primer:  {primer_fwd}\n"
+        f"  Reverse primer:  {primer_rev}\n"
+        f"  Subsample size:  {subsample_size}\n"
+        f"  Output format:   {'raw counts' if raw_counts else 'percentages'}\n"
+        f"\n"
+        f"Output files:\n"
+        f"-------------\n"
+        f"  Primer hits table:    {output_file}\n"
+        f"  Primer sequences:     {primer_file}\n"
+        f"\n"
+        f"{'=' * 80}\n"
+        f"\n"
+        f"Key primer hit statistics:\n"
+        f"\n"
+        f"{fmt_tsv(stat_rows)}\n"
+    )
+
+    summary_txt.write_text(report)
+    # print(report)
+    log("\033[0;32m1.2-check-primers.py completed successfully\033[0m")
 
 ################################################################################
 # 4. Execute

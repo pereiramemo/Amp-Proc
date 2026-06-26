@@ -14,14 +14,19 @@ from datetime import datetime
 from pathlib import Path
 
 # DEV ONLY — comment out before production use
-# reads1      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
-# reads2      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
-# output_dir  = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/sample1"
-# trimmed_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/trimmed"
-# primer_fwd  = "GTGYCAGCMGCCGCGGTAA"
-# primer_rev  = "CCGYCAATTYMTTTRAGTTT"
-# nslots      = 4
-# overwrite   = True
+""" reads1      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+reads2      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
+output_dir  = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/sample1"
+trimmed_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/trimmed"
+primer_fwd  = "GTGYCAGCMGCCGCGGTAA"
+primer_rev  = "CCGYCAATTYMTTTRAGTTT"
+nslots      = 4
+overwrite   = True
+compress    = True
+error_rate = 0.1
+min_overlap = 5
+min_length = 50
+ """
 
 ################################################################################
 # 2. Define functions
@@ -148,7 +153,8 @@ def main():
 
     # Run cutadapt
     log(f"Running cutadapt...")
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, 
+                            stderr=subprocess.STDOUT, text=True)
     log_out.write_text(result.stdout)
 
     if result.returncode != 0:
