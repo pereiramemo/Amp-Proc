@@ -1,0 +1,9 @@
+name: amp-proc-module-3
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - r-base>=4.3
+  - bioconductor-dada2=1.30.0
+  - r-tidyverse=2.0.0
+  - blast=2.16.0

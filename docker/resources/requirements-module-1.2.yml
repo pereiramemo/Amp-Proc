@@ -1,0 +1,7 @@
+name: amp-proc-module-1.2
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python>=3.8
+  - biopython=1.83

@@ -1,0 +1,7 @@
+name: amp-proc-module-2.2.1
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python>=3.8
+  - vsearch=2.29.1
