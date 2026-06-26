@@ -2,8 +2,8 @@
 
 This repository contains scripts for quality checking, preprocessing, denoising/clustering,
 and taxonomic annotation of amplicon sequencing data. The analysis scripts live in `bin/`
-and are written in Python and R: `1.1-quality-check.py`, `1.2-check-primers.py`,
-`1.3-remove-primers.py`, `2.1-dada2-pipeline.R`, `2.2.1-vsearch-pipeline.py`,
+and are written in Python and R: `1.1-quality-check.py`, `1.2-primers-check.py`,
+`1.3-primers-removal.py`, `2.1-dada2-pipeline.R`, `2.2.1-vsearch-pipeline.py`,
 `2.2.2-vsearch-pipeline.py`, `2.2.3-otu-to-seqtable.py`, and `3-taxa_annot.R`.
 
 The pipeline can be run in two ways:
@@ -28,8 +28,8 @@ Units, OTUs).
 ├── nextflow.config                        # Nextflow parameters and Docker settings
 ├── bin/                                   # Analysis scripts (Python + R)
 │   ├── 1.1-quality-check.py               # Quality check with fastp
-│   ├── 1.2-check-primers.py               # IUPAC-aware primer check
-│   ├── 1.3-remove-primers.py             # Primer removal with cutadapt
+│   ├── 1.2-primers-check.py               # IUPAC-aware primer check
+│   ├── 1.3-primers-removal.py             # Primer removal with cutadapt
 │   ├── 2.1-dada2-pipeline.R             # DADA2 ASV pipeline
 │   ├── 2.2.1-vsearch-pipeline.py       # VSEARCH per-sample processing
 │   ├── 2.2.2-vsearch-pipeline.py       # VSEARCH OTU clustering
@@ -111,7 +111,7 @@ Usage: 1.1-quality-check.py [options]
   --overwrite t|f                  Overwrite existing output [default=f]
 ```
 
-### 1.2-check-primers.py
+### 1.2-primers-check.py
 
 Checks primer presence in a paired-end sample with IUPAC ambiguity-code support.
 Subsamples reads and reports detection rates across all four primer orientations. Run it
@@ -123,7 +123,7 @@ Output (under `--output_dir`):
 - `summary_report.txt` — key primer-hit statistics
 
 ```
-Usage: 1.2-check-primers.py [options]
+Usage: 1.2-primers-check.py [options]
 
   --reads1 FILE              R1 FASTQ file (required)
   --reads2 FILE              R2 FASTQ file (required)
@@ -134,7 +134,7 @@ Usage: 1.2-check-primers.py [options]
   --raw_counts               Write raw counts instead of percentages
 ```
 
-### 1.3-remove-primers.py
+### 1.3-primers-removal.py
 
 Removes primers from a paired-end sample using cutadapt. Handles IUPAC ambiguity codes
 and optionally discards reads without detected primers.
@@ -147,7 +147,7 @@ Output:
 - `<output_dir>/summary_report.txt` — human-readable summary
 
 ```
-Usage: 1.3-remove-primers.py [options]
+Usage: 1.3-primers-removal.py [options]
 
   --reads1 FILE              R1 FASTQ file (required)
   --reads2 FILE              R2 FASTQ file (required)
@@ -321,13 +321,13 @@ for R1 in "${INPUT_DIR}"/*_R1_001.fastq.gz; do
     --nslots "${NSLOTS}" --overwrite t
 
   # Step 2: Check primers (before trimming)
-  bin/1.2-check-primers.py \
+  bin/1.2-primers-check.py \
     --reads1 "${R1}" --reads2 "${R2}" \
     --output_dir "results/02_primer_check/${SAMPLE}" \
     --primer_fwd "${PRIMER_FWD}" --primer_rev "${PRIMER_REV}"
 
   # Step 3: Remove primers
-  bin/1.3-remove-primers.py \
+  bin/1.3-primers-removal.py \
     --reads1 "${R1}" --reads2 "${R2}" \
     --output_dir "results/03_primer_removal/${SAMPLE}" \
     --trimmed_dir "${TRIMMED_DIR}" \
@@ -464,8 +464,8 @@ For taxonomic annotation, place the SILVA reference databases under `~/.amp-proc
 ├── bin/                                    # Step scripts (auto-staged onto PATH)
 ├── modules/
 │   ├── 1.1-quality-check.nf                # MODULE_1_1   — fastp QC
-│   ├── 1.2-check-primers.nf                # MODULE_1_2   — primer check (before/after)
-│   ├── 1.3-remove-primers.nf              # MODULE_1_3   — cutadapt primer removal
+│   ├── 1.2-primers-check.nf                # MODULE_1_2   — primer check (before/after)
+│   ├── 1.3-primers-removal.nf              # MODULE_1_3   — cutadapt primer removal
 │   ├── 2.1-dada2-pipeline.nf             # MODULE_2_1   — DADA2 ASV inference
 │   ├── 2.2.1-vsearch-pipeline.nf        # MODULE_2_2_1 — VSEARCH per-sample
 │   ├── 2.2.2-vsearch-pipeline.nf        # MODULE_2_2_2 — VSEARCH OTU clustering
