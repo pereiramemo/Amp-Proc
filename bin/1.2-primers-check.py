@@ -11,6 +11,7 @@ import os
 import re
 import random
 import sys
+import shutil
 from datetime import datetime
 from pathlib import Path
 from Bio import SeqIO
@@ -18,9 +19,11 @@ from Bio.Seq import Seq
 from Bio.Data import IUPACData
 
 # DEV ONLY — comment out before production use
-""" reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+""" 
+reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
 reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
-output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/02_check_primers_before/sample1"
+output_dir = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/02_check_primers_before/sample1")
+sample_name = "1-samo1_S1"
 primer_fwd = "GTGYCAGCMGCCGCGGTAA"
 primer_rev = "CCGYCAATTYMTTTRAGTTT"
 subsample_size = 100
@@ -29,11 +32,23 @@ subsample_size = 100
 # 2. Define functions
 ################################################################################
 
+_log_buffer = []
+_ANSI_RE = re.compile(r'\033\[[0-9;]*m')
+
 def log(msg):
-    print(f"[INFO] {msg}")
+    line = f"[INFO] {msg}"
+    print(line)
+    _log_buffer.append(_ANSI_RE.sub('', line))
+
+def log_warn(msg):
+    line = f'[WARN] {msg}'
+    print(f"\033[1;33m{line}\033[0m", file=sys.stderr)
+    _log_buffer.append(_ANSI_RE.sub('', line))
 
 def log_error(msg):
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+    line = f"[ERROR] {msg}"
+    print(f"\033[0;31m{line}\033[0m", file=sys.stderr)
+    _log_buffer.append(_ANSI_RE.sub('', line))
 
 
 def fmt_tsv(rows):
@@ -49,11 +64,13 @@ def parse_args():
     )
     p.add_argument("--reads1",          required=True,  help="R1 FASTQ file (required)")
     p.add_argument("--reads2",          required=True,  help="R2 FASTQ file (required)")
-    p.add_argument("-o", "--output_dir", required=True, help="Path to output directory")
+    p.add_argument("--output_dir",      required=True, help="Path to output directory")
+    p.add_argument("--sample_name",     default=None,   help="Sample name [default: derived from R1 filename]")
     p.add_argument("--primer_fwd",      required=True,  help="Forward primer sequence")
     p.add_argument("--primer_rev",      required=True,  help="Reverse primer sequence")
-    p.add_argument("-s", "--subsample_size", type=int,  default=1000, help="Reads to subsample per file")
-    p.add_argument("--raw_counts", action="store_true", help="Write raw counts instead of percentages (default: percentages)")
+    p.add_argument("--subsample_size",  type=int,  default=1000, help="Reads to subsample per file")
+    p.add_argument("--raw_counts",      action="store_true", help="Write raw counts instead of percentages (default: percentages)")
+    p.add_argument("--overwrite",       choices=["t", "f"], default="f", help="Overwrite existing output directory [default=f]")
     return p.parse_args()
 
 def all_orients(primer: str):
@@ -93,21 +110,11 @@ def write_table(data_dict, out_file):
         row, col = key.rsplit(".", 1)
         rows.setdefault(row, {})[col] = val
     with open(out_file, "w", newline="") as fh:
-        writer = csv.writer(fh)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
         header = [""] + list(next(iter(rows.values())).keys())
         writer.writerow(header)
         for row_name, coldict in rows.items():
             writer.writerow([row_name] + [coldict[c] for c in header[1:]])
-
-def write_primer_sequences(fwd_orients, rev_orients, out_file):
-    """Write primer sequences in all orientations to a CSV file."""
-    with open(out_file, "w", newline="") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["Primer", "Orientation", "Sequence"])
-        for orient_name, seq in fwd_orients.items():
-            writer.writerow(["Forward", orient_name, seq])
-        for orient_name, seq in rev_orients.items():
-            writer.writerow(["Reverse", orient_name, seq])
 
 ################################################################################
 # 3. Define the main function
@@ -118,11 +125,17 @@ def main():
     opts = parse_args()
     reads1 = opts.reads1
     reads2 = opts.reads2
-    output_dir = opts.output_dir
+    output_dir = Path(opts.output_dir)
+    sample_name = opts.sample_name
     primer_fwd = opts.primer_fwd
     primer_rev = opts.primer_rev
     subsample_size = opts.subsample_size
     raw_counts = opts.raw_counts
+    overwrite = opts.overwrite == "t"
+
+    ###########################################################################
+    # Step 0: Validate inputs and create output directories
+    ###########################################################################
 
     # Validate input files
     if not os.path.isfile(reads1):
@@ -132,12 +145,39 @@ def main():
         log_error(f"R2 file does not exist: {reads2}")
         sys.exit(1)
 
-    # Derive sample name from R1 filename
-    sample_name = Path(reads1).name
-    for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
-        if sample_name.endswith(ext):
-            sample_name = sample_name[: -len(ext)]
-            break
+    # Derive sample name from R1 filename if not provided
+    if sample_name is None:
+        sample_name = Path(reads1).name
+        for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
+            if sample_name.endswith(ext):
+                sample_name = sample_name[: -len(ext)]
+                break
+
+    # Check if output directory exists and handle overwrite option
+    if output_dir.exists():
+        if overwrite:
+            log_warn(f"Overwriting existing directory: {output_dir}")
+            shutil.rmtree(output_dir)
+        else:
+            log_error(f"Output directory exists: {output_dir}. Use --overwrite t to overwrite.")
+            sys.exit(1)
+
+    # Create output directories
+    primer_check_dir = output_dir / "output"
+    logs_dir  = output_dir / "logs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    primer_check_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    primer_check_out = primer_check_dir / f"{sample_name}_primer-check.tsv"
+    log_out  = logs_dir  / f"{sample_name}_primers-check.log"
+
+    ###########################################################################
+    # Step 1: Obtain all orientations of the primers and compile regex patterns
+    ###########################################################################
+
+    log(f"Processing sample: {sample_name}")
+    log(f"Forward primer: {primer_fwd}")
+    log(f"Reverse primer: {primer_rev}")
 
     # Prepare primer orientations and regexes
     fwd_orients = all_orients(primer_fwd)
@@ -145,15 +185,17 @@ def main():
     fwd_regex = {name: primer_to_regex(seq) for name, seq in fwd_orients.items()}
     rev_regex = {name: primer_to_regex(seq) for name, seq in rev_orients.items()}
 
-    # Create output directory
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
+    # Log primer sequences in all orientations (captured into the log file)
+    log("Primer sequences (all orientations):")
+    for orient_name, seq in fwd_orients.items():
+        log(f"  FwdPrimer.{orient_name}: {seq}")
+    for orient_name, seq in rev_orients.items():
+        log(f"  RevPrimer.{orient_name}: {seq}")
 
-    # Write primer sequences (once per run)
-    primer_file = output_dir_path / "primer_sequences.csv"
-    write_primer_sequences(fwd_orients, rev_orients, primer_file)
+    ###########################################################################
+    # Step 2: Read and subsample
+    ###########################################################################
 
-    # Read and subsample
     with open_maybe_gzip(reads1) as handle:
         seqs1 = list(SeqIO.parse(handle, "fastq"))
     with open_maybe_gzip(reads2) as handle:
@@ -166,7 +208,12 @@ def main():
         random.seed(123)
         seqs2 = random.sample(seqs2, subsample_size)
 
-    # Count primer hits
+    log(f"Subsampled reads: R1={len(seqs1)} R2={len(seqs2)} (cap {subsample_size})")
+
+    ###########################################################################
+    # Step 3: Count primer hits
+    ###########################################################################
+
     hit_counts = {}
     hit_counts.update({
         f"FwdReads.FwdPrimer.{orient}": count_hits(seqs1, regex)
@@ -185,18 +232,20 @@ def main():
         for orient, regex in rev_regex.items()
     })
 
-    output_file = output_dir_path / f"{sample_name}_primer_check.csv"
+    ###########################################################################
+    # Step 4: Calculate percentages
+    ###########################################################################
 
     if raw_counts:
-        write_table(hit_counts, output_file)
+        write_table(hit_counts, primer_check_out)
         display_vals = hit_counts
     else:
         perc = {k: round(v / subsample_size * 100, 2) for k, v in hit_counts.items()}
-        write_table(perc, output_file)
+        write_table(perc, primer_check_out)
         display_vals = perc
 
     ###########################################################################
-    # Summary report
+    # Step 5: Write summary report
     ###########################################################################
 
     log("Generating summary report...")
@@ -213,7 +262,7 @@ def main():
         [k, str(display_vals[k])] for k in key_keys if k in display_vals
     ]
 
-    summary_txt = output_dir_path / "summary_report.txt"
+    report_out = output_dir / f"{sample_name}_summary_report.txt"
     report = (
         f"{'=' * 80}\n"
         f"Primer Check Report\n"
@@ -233,8 +282,8 @@ def main():
         f"\n"
         f"Output files:\n"
         f"-------------\n"
-        f"  Primer hits table:    {output_file}\n"
-        f"  Primer sequences:     {primer_file}\n"
+        f"  Statistics:           {primer_check_out}\n"
+        f"  Log (incl. primers):  {log_out}\n"
         f"\n"
         f"{'=' * 80}\n"
         f"\n"
@@ -243,9 +292,10 @@ def main():
         f"{fmt_tsv(stat_rows)}\n"
     )
 
-    summary_txt.write_text(report)
+    report_out.write_text(report)
     # print(report)
-    log("\033[0;32m1.2-check-primers.py completed successfully\033[0m")
+    log("\033[0;32m1.2-primers-check.py completed successfully\033[0m")
+    log_out.write_text("\n".join(_log_buffer) + "\n")
 
 ################################################################################
 # 4. Execute

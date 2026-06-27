@@ -4,10 +4,10 @@
 // Output: per-sample fastp HTML/JSON reports + summary
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_1_1 {
+process MODULE_1_1_QUALITY_CHECK {
 
-    container "ghcr.io/epereira/amp-proc/module-1.1:latest"
-    publishDir "${params.output_dir}/1.1-quality-check",
+    container "ghcr.io/epereira/amp-proc/1.1-quality-check:latest"
+    publishDir "${params.output_dir}/1.1-quality-check-out",
            mode: "copy",
            enabled: params.full_output.toBoolean()
 
@@ -24,12 +24,9 @@ process MODULE_1_1 {
     1.1-quality-check.py \
         --reads1                     ${reads[0]} \
         --reads2                     ${reads[1]} \
+        --sample_name                 ${sample_name} \
         --output_dir                 ${sample_name} \
         --nslots                     ${params.nslots} \
-        --min_length                 ${params.qc_min_length} \
-        --qualified_quality_phred    ${params.qualified_quality_phred} \
-        --unqualified_percent_limit  ${params.unqualified_percent_limit} \
-        --disable_adapter_trimming   ${params.disable_adapter_trimming} \
         --overwrite                  t
     """
 

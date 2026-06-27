@@ -38,8 +38,8 @@ def parse_args():
     )
     p.add_argument("--reads1",            required=True,              help="R1 FASTQ file (required)")
     p.add_argument("--reads2",            required=True,              help="R2 FASTQ file (required)")
-    p.add_argument("-o", "--output_dir",  required=True,              help="Per-sample output directory for logs and stats (required)")
-    p.add_argument("--trimmed_dir",       default=None,               help="Directory for trimmed FASTQ output [default: {output_dir}/trimmed]")
+    p.add_argument("--output_dir",  required=True,              help="Per-sample output directory for logs and stats (required)")
+    p.add_argument("--sample_name",       default=None,               help="Sample name [default: derived from R1 filename]")
     p.add_argument("--primer_fwd",        required=True,              help="Forward primer sequence (5' to 3') (required)")
     p.add_argument("--primer_rev",        required=True,              help="Reverse primer sequence (5' to 3') (required)")
     p.add_argument("--nslots",            type=int,   default=12,     help="Number of threads [default=12]")
@@ -81,6 +81,7 @@ def main():
     reads1            = opts.reads1
     reads2            = opts.reads2
     output_dir        = Path(opts.output_dir)
+    sample_name       = opts.sample_name
     primer_fwd        = opts.primer_fwd
     primer_rev        = opts.primer_rev
     nslots            = opts.nslots
@@ -90,6 +91,10 @@ def main():
     discard_untrimmed = opts.discard_untrimmed == "t"
     compress          = opts.compress == "t"
     overwrite         = opts.overwrite == "t"
+
+    ###########################################################################
+    # Step 0: Validate inputs and create output directories
+    ###########################################################################
 
     # Validate input files
     if not os.path.isfile(reads1):
@@ -120,11 +125,12 @@ def main():
     stats_dir.mkdir(parents=True, exist_ok=True)
 
     # Shared trimmed output directory (not deleted on overwrite)
-    trimmed_dir = Path(opts.trimmed_dir) if opts.trimmed_dir else output_dir / "trimmed"
+    trimmed_dir = output_dir / "output"
     trimmed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Derive sample name
-    sample_name = derive_sample_name(reads1)
+    # Derive sample name from R1 filename if not provided
+    if sample_name is None:
+        sample_name = derive_sample_name(reads1)
     log(f"Processing sample: {sample_name}")
     log(f"Forward primer: {primer_fwd}")
     log(f"Reverse primer: {primer_rev}")
@@ -134,6 +140,12 @@ def main():
     r1_out = trimmed_dir / f"{sample_name}_R1_trimmed{ext}"
     r2_out = trimmed_dir / f"{sample_name}_R2_trimmed{ext}"
     log_out = logs_dir   / f"{sample_name}_cutadapt.log"
+    stats_out = stats_dir  / f"{sample_name}_stats.tsv"
+    report_out  = output_dir / f"{sample_name}_summary_report.txt"
+
+    ###########################################################################
+    # Step 1: Run cutadapt to remove primers
+    ###########################################################################
 
     # Build cutadapt command
     cmd = [
@@ -162,7 +174,10 @@ def main():
         log_error(f"Check log file: {log_out}")
         sys.exit(1)
 
-    # Extract summary statistics from log
+    ###########################################################################
+    # Step 2: Extract summary statistics from cutadapt log
+    ###########################################################################
+
     log_text = result.stdout
     m = re.search(r'Total read pairs processed:\s+([\d,]+)', log_text)
     total_pairs = int(m.group(1).replace(',', '')) if m else 0
@@ -171,19 +186,20 @@ def main():
 
     percent_trimmed = f"{pairs_written / total_pairs * 100:.2f}" if total_pairs > 0 else "0.00"
 
-    summary_file = stats_dir / "summary.tsv"
-    summary_file.write_text(
+    stats_out.write_text(
         "sample\ttotal_pairs\ttrimmed_pairs\tpercent_trimmed\n"
         f"{sample_name}\t{total_pairs}\t{pairs_written}\t{percent_trimmed}\n"
     )
 
-    # Generate human-readable summary report
+    ###########################################################################
+    # Step 3: Write summary report
+    ###########################################################################
+
     log("Generating summary report...")
-    summary_txt  = output_dir / "summary_report.txt"
     discard_label = "yes" if discard_untrimmed else "no"
     compress_label = "yes" if compress else "no"
 
-    tsv_lines = summary_file.read_text().splitlines()
+    tsv_lines = stats_out.read_text().splitlines()
     rows  = [line.split("\t") for line in tsv_lines]
     col_w = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
     tsv_formatted = "\n".join(
@@ -220,8 +236,8 @@ def main():
         f"- Trimmed R1: {r1_out}\n"
         f"- Trimmed R2: {r2_out}\n"
         f"- Processing log: {log_out}\n"
-        f"- Summary statistics: {summary_file}\n"
-        f"- This report: {summary_txt}\n"
+        f"- Summary statistics: {stats_out}\n"
+        f"- This report: {report_out}\n"
         f"\n"
         f"{'=' * 80}\n"
         f"\n"
@@ -230,12 +246,9 @@ def main():
         f"{tsv_formatted}\n"
     )
 
-    summary_txt.write_text(report)
-    print(report)
-
-    log("\033[0;32m1.3-primer_removal_cutadapt.py completed successfully\033[0m")
-    log(f"Trimmed reads available in: {trimmed_dir}")
-    log(f"Summary statistics: {summary_file}")
+    report_out.write_text(report)
+    # print(report)
+    log("\033[0;32m1.3-primers-removal_cutadapt.py completed successfully\033[0m")
 
 ################################################################################
 # 4. Execute

@@ -4,25 +4,25 @@
 // Output: ASV table + filtered reads + plots/tables
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_2_1 {
+process MODULE_2_1_DADA2_PIPELINE {
 
-    container "ghcr.io/epereira/amp-proc/module-2.1:latest"
-    publishDir "${params.output_dir}/2.1-dada2-pipeline",
+    container "ghcr.io/epereira/amp-proc/2.1-dada2-pipeline:latest"
+    publishDir "${params.output_dir}/",
            mode: "copy",
            enabled: params.full_output.toBoolean()
 
     input:
-    path reads
+    path all_trimmed
 
     output:
-    path "dada2",                 emit: dir
-    path "dada2/asv_table.csv",   emit: asv_table
+    path "2.1-dada2-pipeline-out",                        emit: dir
+    path "2.1-dada2-pipeline-out/output/asv_table.csv",   emit: asv_table
 
     script:
     """
     2.1-dada2-pipeline.R \
         --input_dir       . \
-        --output_dir      dada2 \
+        --output_dir      2.1-dada2-pipeline-out \
         --pattern_r1      _R1_trimmed.fastq.gz \
         --pattern_r2      _R2_trimmed.fastq.gz \
         --trunc_r1        ${params.trunc_r1} \

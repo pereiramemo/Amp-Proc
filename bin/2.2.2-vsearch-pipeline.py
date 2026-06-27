@@ -167,7 +167,7 @@ def main():
         "--fasta_width",  0,
         "--threads",      nslots,
     ]
-    run(cluster_cmd, log_path=output_dir / "logs" / "cluster.log")
+    run(cluster_cmd, log_path=output_dir / "logs" / "otu_cluster.log")
 
     n_otus = count_fasta_seqs(otus_fasta)
 
@@ -182,7 +182,8 @@ def main():
         ["pooled_seqs",   str(n_total)],
         ["otus",          str(n_otus)],
     ]
-    (output_dir / "stats" / "otu_summary.tsv").write_text(
+    stats_out = output_dir / "stats" / "otu_stats.tsv"
+    stats_out.write_text(
         "\n".join("\t".join(r) for r in otu_rows) + "\n"
     )
 
@@ -191,7 +192,7 @@ def main():
     ###########################################################################
 
     log("Generating summary report...")
-    summary_txt = output_dir / "summary_report.txt"
+    report_out = output_dir / "otu_summary_report.txt"
 
     report = (
         f"{'=' * 80}\n"
@@ -221,7 +222,7 @@ def main():
         f"{fmt_tsv(otu_rows)}\n"
     )
 
-    summary_txt.write_text(report)
+    report_out.write_text(report)
     # print(report)
     log("\033[0;32m2.2.2-vsearch-pipeline.py completed successfully\033[0m")
 

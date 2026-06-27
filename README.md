@@ -4,7 +4,7 @@ This repository contains scripts for quality checking, preprocessing, denoising/
 and taxonomic annotation of amplicon sequencing data. The analysis scripts live in `bin/`
 and are written in Python and R: `1.1-quality-check.py`, `1.2-primers-check.py`,
 `1.3-primers-removal.py`, `2.1-dada2-pipeline.R`, `2.2.1-vsearch-pipeline.py`,
-`2.2.2-vsearch-pipeline.py`, `2.2.3-otu-to-seqtable.py`, and `3-taxa_annot.R`.
+`2.2.2-vsearch-pipeline.py`, `2.2.3-otu-to-seqtable.py`, and `3-taxa-annot.R`.
 
 The pipeline can be run in two ways:
 
@@ -34,14 +34,14 @@ Units, OTUs).
 │   ├── 2.2.1-vsearch-pipeline.py       # VSEARCH per-sample processing
 │   ├── 2.2.2-vsearch-pipeline.py       # VSEARCH OTU clustering
 │   ├── 2.2.3-otu-to-seqtable.py        # OTU -> sequence-keyed table (for taxonomy)
-│   ├── 3-taxa_annot.R                    # Taxonomic annotation
+│   ├── 3-taxa-annot.R                    # Taxonomic annotation
 │   ├── toolbox.R                         # Shared R utility functions
 │   └── old/                             # Legacy bash/R scripts (deprecated)
 ├── modules/                             # Nextflow process definitions (*.nf)
 ├── docker/                              # Per-module Dockerfiles + build script
-│   ├── Dockerfile.module-*
+│   ├── *.Dockerfile
 │   ├── dockerbuild_commands.sh
-│   └── resources/requirements-module-*.yml
+│   └── resources/*.requirements.yml
 └── tests/
     ├── data/                           # Test FASTQ files (3 samples)
     └── test_commands.sh                # End-to-end test runner
@@ -92,20 +92,17 @@ report-only mode — reads are not modified.
 Output (under `--output_dir`):
 - `reports/<sample>_fastp.html` — interactive HTML report
 - `reports/<sample>_fastp.json` — JSON metrics
-- `reports/<sample>_fastp.log` — processing log
-- `summary_report.txt` — human-readable summary
+- `logs/<sample>_fastp.log` — processing log
+- `stats/<sample>_stats.tsv` — summary statistics
+- `<sample>_summary_report.txt` — human-readable summary
 
 ```
 Usage: 1.1-quality-check.py [options]
 
   --reads1 FILE                    R1 FASTQ file (required)
   --reads2 FILE                    R2 FASTQ file (required)
-  -o, --output_dir DIR             Output directory (required)
+  --output_dir DIR                 Output directory (required)
   --nslots INT                     Threads [default=12]
-  --min_length INT                 Min read length, reporting only [default=50]
-  --qualified_quality_phred INT    Phred for a qualified base [default=20]
-  --unqualified_percent_limit INT  Max % unqualified bases [default=40]
-  --disable_adapter_trimming t|f   Disable adapter trimming [default=t]
   --html_report t|f                Generate HTML report [default=t]
   --json_report t|f                Keep JSON report [default=t]
   --overwrite t|f                  Overwrite existing output [default=f]
@@ -120,17 +117,20 @@ both before and after primer removal to confirm trimming worked.
 Output (under `--output_dir`):
 - `<sample>_primer_check.csv` — primer hit percentages (or counts) per orientation
 - `primer_sequences.csv` — primer sequences in all four orientations
-- `summary_report.txt` — key primer-hit statistics
+- `stats/<sample>_stats.tsv` — key primer-hit statistics
+- `logs/<sample>_primers-check.log` — run log
+- `<sample>_summary_report.txt` — human-readable summary
 
 ```
 Usage: 1.2-primers-check.py [options]
 
   --reads1 FILE              R1 FASTQ file (required)
   --reads2 FILE              R2 FASTQ file (required)
-  -o, --output_dir DIR       Output directory (required)
+  --output_dir DIR           Output directory (required)
+  --sample_name CHAR         Sample name [default: derived from R1 filename]
   --primer_fwd CHAR          Forward primer sequence (required)
   --primer_rev CHAR          Reverse primer sequence (required)
-  -s, --subsample_size INT   Reads to subsample per file [default=1000]
+  --subsample_size INT       Reads to subsample per file [default=1000]
   --raw_counts               Write raw counts instead of percentages
 ```
 
@@ -143,8 +143,8 @@ Output:
 - `<trimmed_dir>/<sample>_R1_trimmed.fastq.gz` — trimmed R1 reads
 - `<trimmed_dir>/<sample>_R2_trimmed.fastq.gz` — trimmed R2 reads
 - `<output_dir>/logs/<sample>_cutadapt.log` — per-sample cutadapt log
-- `<output_dir>/stats/summary.tsv` — trimming statistics
-- `<output_dir>/summary_report.txt` — human-readable summary
+- `<output_dir>/stats/<sample>_stats.tsv` — trimming statistics
+- `<output_dir>/<sample>_summary_report.txt` — human-readable summary
 
 ```
 Usage: 1.3-primers-removal.py [options]
@@ -152,6 +152,7 @@ Usage: 1.3-primers-removal.py [options]
   --reads1 FILE              R1 FASTQ file (required)
   --reads2 FILE              R2 FASTQ file (required)
   -o, --output_dir DIR       Per-sample directory for logs/stats (required)
+  --sample_name CHAR         Sample name [default: derived from R1 filename]
   --trimmed_dir DIR          Directory for trimmed FASTQ [default: {output_dir}/trimmed]
   --primer_fwd CHAR          Forward primer 5'->3' (required)
   --primer_rev CHAR          Reverse primer 5'->3' (required)
@@ -171,11 +172,14 @@ filtering → error learning → denoising → PE merging → chimera removal. O
 directory of trimmed reads.
 
 Output (under `--output_dir`):
-- `asv_table.csv` — ASV abundance table (sequences × samples)
-- `filtered/` — quality-filtered reads
-- `plots/` — quality, error, read-retention, and length plots
-- `tables/` — read counts and per-sample length statistics
-- `session_info.txt` — parameters and package versions
+- `output/asv_table.csv` — ASV abundance table (sequences × samples)
+- `output/filtered/` — quality-filtered reads
+- `output/plots/` — quality, error, read-retention, and length plots
+- `output/tables/` — read counts and per-sample length statistics
+- `output/session_info.txt` — parameters and package versions
+- `stats/dada2_stats.tsv` — per-sample read tracking (raw → filtered → denoised → merged → nobim)
+- `logs/dada2.log` — run log
+- `summary_report.txt` — human-readable summary
 
 ```
 Usage: 2.1-dada2-pipeline.R [options]
@@ -207,7 +211,7 @@ Output (under `--output_dir`, one directory per sample):
 - `02-filtered/<sample>-02-filtered.fasta.gz`
 - `03-derep/<sample>-03-derep.fasta.gz`
 - `04-chimera-checked/<sample>-04-chimera-checked.fasta.gz`
-- `logs/`, `stats/01..04-*-summary.tsv`, `summary_report.txt`
+- `logs/<sample>_<step>.log`, `stats/<sample>_stats.tsv`, `<sample>_summary_report.txt`
 
 ```
 Usage: 2.2.1-vsearch-pipeline.py [options]
@@ -236,7 +240,7 @@ Output (under `--output_dir`):
 - `all_samples.fasta.gz` — pooled, sample-labeled sequences
 - `otus/otus.fasta.gz` — OTU representative (centroid) sequences
 - `otus/otu_table.tsv` — OTU abundance table (OTUs × samples)
-- `stats/otu_summary.tsv`, `logs/cluster.log`, `summary_report.txt`
+- `stats/otu_stats.tsv`, `logs/otu_cluster.log`, `otu_summary_report.txt`
 
 ```
 Usage: 2.2.2-vsearch-pipeline.py [options]
@@ -251,7 +255,7 @@ Usage: 2.2.2-vsearch-pipeline.py [options]
 ### 2.2.3-otu-to-seqtable.py
 
 Bridges the VSEARCH OTU outputs into a DADA2-style, **sequence-keyed** count table so the
-OTU centroids can be annotated with `3-taxa_annot.R` (which expects DNA sequences as row
+OTU centroids can be annotated with `3-taxa-annot.R` (which expects DNA sequences as row
 identifiers). Maps each `OTU_N` to its centroid sequence and writes a table whose first
 column is the sequence and whose remaining columns are the per-sample counts.
 
@@ -263,7 +267,7 @@ Usage: 2.2.3-otu-to-seqtable.py [options]
   -o, --output FILE   Output sequence-keyed CSV (required)
 ```
 
-### 3-taxa_annot.R
+### 3-taxa-annot.R
 
 Assigns taxonomy to ASVs or OTUs. Supports three methods: Naive Bayes Classifier (NBC),
 NBC combined with exact species matching (NBCandEM), or BLAST. Reference databases are not
@@ -275,7 +279,7 @@ Output:
   - BLAST: best-hit accession, organism, taxonomy path, percent identity
 
 ```
-Usage: 3-taxa_annot.R [options]
+Usage: 3-taxa-annot.R [options]
 
   --input_asv_table CHAR    Sequence-keyed ASV/OTU table (required)
   --input_fasta CHAR        FASTA of sequences to annotate (generated from table if omitted)
@@ -345,7 +349,7 @@ bin/2.1-dada2-pipeline.R \
   --nslots "${NSLOTS}" --overwrite
 
 # Step 5: Annotate taxonomy
-bin/3-taxa_annot.R \
+bin/3-taxa-annot.R \
   --input_asv_table results/04_dada2/asv_table.csv \
   --output_asv_table results/asv_table_annotated.csv \
   --method NBC \
@@ -382,7 +386,7 @@ bin/2.2.3-otu-to-seqtable.py \
   --output     results/05_vsearch/otu/otus/otu_seqtable.csv
 
 # Step 5b: Annotate taxonomy
-bin/3-taxa_annot.R \
+bin/3-taxa-annot.R \
   --input_asv_table results/05_vsearch/otu/otus/otu_seqtable.csv \
   --output_asv_table results/otu_table_annotated.csv \
   --method NBC \
@@ -419,7 +423,7 @@ databases.
 
 For the standalone route, all dependencies are available through the provided
 `environment.yml`. For the Nextflow route they are pinned per module in
-`docker/resources/requirements-module-*.yml`.
+`docker/resources/*.requirements.yml`.
 
 ## Nextflow pipeline
 
@@ -427,7 +431,7 @@ In addition to the standalone scripts, the pipeline is available as a containeri
 [Nextflow](https://www.nextflow.io/) workflow that mirrors the structure and
 conventions of [Mg-Clust](https://github.com/pereiramemo/Mg-Clust). Each step is a
 process defined under `modules/`, wrapping the corresponding script in `bin/`, and runs
-in its own Docker image built from `docker/Dockerfile.module-*`.
+in its own Docker image built from `docker/*.Dockerfile`.
 
 ### Installation
 
@@ -451,9 +455,9 @@ cd Amp-Proc
 bash docker/dockerbuild_commands.sh
 ```
 
-This builds and tags one image per module (`ghcr.io/epereira/amp-proc/module-*`).
+This builds and tags one image per module (`ghcr.io/epereira/amp-proc/*`).
 For taxonomic annotation, place the SILVA reference databases under `~/.amp-proc/db/`
-(the directory is mounted into the `MODULE_3` container — see `nextflow.config`).
+(the directory is mounted into the `MODULE_3_TAXA_ANNOT` container — see `nextflow.config`).
 
 ### Layout
 
@@ -463,34 +467,34 @@ For taxonomic annotation, place the SILVA reference databases under `~/.amp-proc
 ├── nextflow.config                         # Parameters and Docker settings
 ├── bin/                                    # Step scripts (auto-staged onto PATH)
 ├── modules/
-│   ├── 1.1-quality-check.nf                # MODULE_1_1   — fastp QC
-│   ├── 1.2-primers-check.nf                # MODULE_1_2   — primer check (before/after)
-│   ├── 1.3-primers-removal.nf              # MODULE_1_3   — cutadapt primer removal
-│   ├── 2.1-dada2-pipeline.nf             # MODULE_2_1   — DADA2 ASV inference
-│   ├── 2.2.1-vsearch-pipeline.nf        # MODULE_2_2_1 — VSEARCH per-sample
-│   ├── 2.2.2-vsearch-pipeline.nf        # MODULE_2_2_2 — VSEARCH OTU clustering
-│   ├── 2.2.3-otu-to-seqtable.nf         # MODULE_2_2_3 — OTU -> sequence-keyed table
-│   └── 3-taxa-annot.nf                    # MODULE_3     — taxonomic annotation
+│   ├── 1.1-quality-check.nf                # MODULE_1_1_QUALITY_CHECK   — fastp QC
+│   ├── 1.2-primers-check.nf                # MODULE_1_2_PRIMERS_CHECK   — primer check (before/after)
+│   ├── 1.3-primers-removal.nf              # MODULE_1_3_PRIMERS_REMOVAL   — cutadapt primer removal
+│   ├── 2.1-dada2-pipeline.nf             # MODULE_2_1_DADA2_PIPELINE   — DADA2 ASV inference
+│   ├── 2.2.1-vsearch-pipeline.nf        # MODULE_2_2_1_VSEARCH_PIPELINE — VSEARCH per-sample
+│   ├── 2.2.2-vsearch-pipeline.nf        # MODULE_2_2_2_VSEARCH_PIPELINE — VSEARCH OTU clustering
+│   ├── 2.2.3-otu-to-seqtable.nf         # MODULE_2_2_3_OTU_TO_SEQTABLE — OTU -> sequence-keyed table
+│   └── 3-taxa-annot.nf                    # MODULE_3_TAXA_ANNOT     — taxonomic annotation
 └── docker/
-    ├── Dockerfile.module-*                 # One image per module (micromamba)
+    ├── *.Dockerfile                 # One image per module (micromamba)
     ├── dockerbuild_commands.sh             # Build + tag all images
-    └── resources/requirements-module-*.yml # Conda environment per module
+    └── resources/*.requirements.yml # Conda environment per module
 ```
 
 ### Workflow
 
-After primer removal (`MODULE_1_3`), the `--method` parameter selects the denoising
+After primer removal (`MODULE_1_3_PRIMERS_REMOVAL`), the `--method` parameter selects the denoising
 branch:
 
-- `dada2`   → `MODULE_2_1` (ASV table)
-- `vsearch` → `MODULE_2_2_1` + `MODULE_2_2_2` (OTU table)
+- `dada2`   → `MODULE_2_1_DADA2_PIPELINE` (ASV table)
+- `vsearch` → `MODULE_2_2_1_VSEARCH_PIPELINE` + `MODULE_2_2_2_VSEARCH_PIPELINE` (OTU table)
 - `both`    → both branches in parallel (default)
 
-`MODULE_1_1` (fastp QC) and `MODULE_1_2` (primer check, before and after) are
-diagnostic and always run. Taxonomic annotation (`MODULE_3`) runs on the ASV table
+`MODULE_1_1_QUALITY_CHECK` (fastp QC) and `MODULE_1_2_PRIMERS_CHECK` (primer check, before and after) are
+diagnostic and always run. Taxonomic annotation (`MODULE_3_TAXA_ANNOT`) runs on the ASV table
 and/or the OTU centroids when `--skip_tax_annot false` is set; for the OTU branch,
-`MODULE_2_2_3` first rebuilds a sequence-keyed count table from the OTU centroids so
-the same `3-taxa_annot.R` script can be reused unchanged.
+`MODULE_2_2_3_OTU_TO_SEQTABLE` first rebuilds a sequence-keyed count table from the OTU centroids so
+the same `3-taxa-annot.R` script can be reused unchanged.
 
 ### Run
 
@@ -519,7 +523,7 @@ nextflow run main.nf \
 nextflow run main.nf --help
 ```
 
-Reference databases for `MODULE_3` are mounted into the container from `~/.amp-proc`
+Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container from `~/.amp-proc`
 (configured via `containerOptions` in `nextflow.config`).
 
 ## License

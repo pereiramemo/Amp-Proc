@@ -18,7 +18,6 @@ from pathlib import Path
 reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
 output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/01_fastp/sample1"
 nslots = 4
-disable_adapter_trimming = True
 overwrite = True
  """
 ################################################################################
@@ -31,12 +30,9 @@ def parse_args():
     )
     p.add_argument("--reads1",                    required=True,              help="R1 FASTQ file (required)")
     p.add_argument("--reads2",                    required=True,              help="R2 FASTQ file (required)")
-    p.add_argument("-o", "--output_dir",          required=True,              help="Output directory (required)")
+    p.add_argument("--output_dir",                required=True,              help="Output directory (required)")
+    p.add_argument("--sample_name",               default=None,   help="Sample name [default: derived from R1 filename]")
     p.add_argument("--nslots",                    type=int,   default=12,     help="Number of threads [default=12]")
-    p.add_argument("--min_length",                type=int,   default=50,     help="Minimum read length (reporting only) [default=50]")
-    p.add_argument("--qualified_quality_phred",   type=int,   default=20,     help="Phred score for qualified base (reporting only) [default=20]")
-    p.add_argument("--unqualified_percent_limit", type=int,   default=40,     help="Max percent of unqualified bases (reporting only) [default=40]")
-    p.add_argument("--disable_adapter_trimming",  choices=["t", "f"], default="t", help="Disable adapter trimming [default=t]")
     p.add_argument("--html_report",               choices=["t", "f"], default="t", help="Generate HTML report [default=t]")
     p.add_argument("--json_report",               choices=["t", "f"], default="t", help="Keep JSON report after stats extraction [default=t]")
     p.add_argument("--overwrite",                 choices=["t", "f"], default="f", help="Overwrite existing output directory [default=f]")
@@ -64,8 +60,8 @@ def main():
     reads1 = opts.reads1
     reads2 = opts.reads2
     output_dir = Path(opts.output_dir)
+    sample_name = opts.sample_name
     nslots = opts.nslots
-    disable_adapter_trimming = opts.disable_adapter_trimming == "t"
     html_report = opts.html_report == "t"
     json_report = opts.json_report == "t"
     overwrite = opts.overwrite == "t"
@@ -93,19 +89,22 @@ def main():
             log_error(f"Output directory exists: {output_dir}. Use --overwrite t to overwrite.")
             sys.exit(1)
 
-    reports_dir = output_dir / "reports"
+    reports_dir = output_dir / "outputs"
     stats_dir   = output_dir / "stats"
+    logs_dir    = output_dir / "logs"
     reports_dir.mkdir(parents=True, exist_ok=True)
     stats_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Derive sample name
-    sample_name = derive_sample_name(reads1)
+    if sample_name is None:
+        sample_name = derive_sample_name(reads1)
     log(f"Processing sample: {sample_name}")
 
     # Paths for fastp outputs
     html_out = reports_dir / f"{sample_name}_fastp.html"
     json_out = reports_dir / f"{sample_name}_fastp.json"
-    log_out  = reports_dir / f"{sample_name}_fastp.log"
+    log_out  = logs_dir    / f"{sample_name}_fastp.log"
 
     # Build fastp command
     cmd = [
@@ -123,9 +122,6 @@ def main():
         cmd += ["--html", str(html_out)]
     else:
         cmd += ["--html", "/dev/null"]
-
-    if disable_adapter_trimming:
-        cmd.append("--disable_adapter_trimming")
 
     # Run fastp
     log("Running fastp...")
@@ -154,7 +150,7 @@ def main():
     gc_content     = bf["gc_content"]
 
     # Write summary TSV
-    summary_file = stats_dir / "summary.tsv"
+    stats_out = stats_dir / f"{sample_name}_stats.tsv"
     header = "\t".join([
         "sample", "total_reads", "total_bases",
         "q20_bases", "q20_rate", "q30_bases", "q30_rate",
@@ -165,15 +161,14 @@ def main():
         q20_bases, q20_rate, q30_bases, q30_rate,
         r1_mean_length, r2_mean_length, gc_content,
     ])
-    
+    stats_out.write_text(header + "\n" + row + "\n")
 
     if not json_report:
         json_out.unlink(missing_ok=True)
 
     # Generate human-readable summary report
     log("Generating summary report...")
-    summary_txt = output_dir / "summary_report.txt"
-    adapter_label = "disabled" if disable_adapter_trimming else "enabled"
+    report_out = output_dir / f"{sample_name}_summary_report.txt"
 
     tsv_rows = [header.split("\t"), row.split("\t")]
     col_w = [max(len(r[i]) for r in tsv_rows) for i in range(len(tsv_rows[0]))]
@@ -196,15 +191,14 @@ def main():
         f"-----------\n"
         f"Threads: {nslots}\n"
         f"Mode: Report only (no filtering applied)\n"
-        f"Adapter trimming: {adapter_label}\n"
         f"\n"
         f"Output files:\n"
         f"-------------\n"
         f"- HTML report: {html_out}\n"
         f"- JSON report: {json_out}\n"
         f"- Processing log: {log_out}\n"
-        f"- Summary statistics: {summary_file}\n"
-        f"- This report: {summary_txt}\n"
+        f"- Summary statistics: {stats_out}\n"
+        f"- This report: {report_out}\n"
         f"\n"
         f"{'=' * 80}\n"
         f"\n"
@@ -213,8 +207,8 @@ def main():
         f"{tsv_formatted}\n"
     )
 
-    summary_txt.write_text(report)
-    # print(report) 
+    report_out.write_text(report)
+    # print(report)
     log("\033[0;32m1.1-quality-check.py completed successfully\033[0m")
     
 ################################################################################

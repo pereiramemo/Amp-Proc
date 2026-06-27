@@ -5,9 +5,9 @@
 // Called twice (before / after primer removal) via aliased imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_1_2 {
+process MODULE_1_2_PRIMERS_CHECK {
 
-    container "ghcr.io/epereira/amp-proc/module-1.2:latest"
+    container "ghcr.io/epereira/amp-proc/1.2-primers-check:latest"
     publishDir { "${params.output_dir}/${publish_subdir}" },
            mode: "copy",
            enabled: params.full_output.toBoolean()
@@ -23,9 +23,10 @@ process MODULE_1_2 {
 
     script:
     """
-    1.2-check-primers.py \
+    1.2-primers-check.py \
         --reads1          ${reads[0]} \
         --reads2          ${reads[1]} \
+        --sample_name     ${sample_name} \
         --output_dir      ${sample_name} \
         --primer_fwd      ${params.primer_fwd} \
         --primer_rev      ${params.primer_rev} \

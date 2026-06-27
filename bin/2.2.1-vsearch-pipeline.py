@@ -39,6 +39,7 @@ def parse_args():
     p.add_argument("--reads1",          required=True,              help="R1 FASTQ file (required)")
     p.add_argument("--reads2",          required=True,              help="R2 FASTQ file (required)")
     p.add_argument("-o", "--output_dir", required=True,             help="Per-sample output directory for logs and stats (required)")
+    p.add_argument("--sample_name",     default=None,               help="Sample name [default: derived from R1 filename]")
     p.add_argument("--nslots",          type=int,   default=12,     help="Number of threads [default=12]")
     p.add_argument("--min_length",      type=int,   default=50,     help="Minimum merged-read length [default=50]")
     p.add_argument("--fastq_minovlen",  type=int,   default=5,      help="Minimum overlap for PE merging [default=5]")
@@ -116,6 +117,7 @@ def main():
     reads1       = opts.reads1
     reads2       = opts.reads2
     output_dir   = Path(opts.output_dir)
+    sample_name  = opts.sample_name
     nslots       = opts.nslots
     min_length   = opts.min_length
     minovlen     = opts.fastq_minovlen
@@ -157,7 +159,8 @@ def main():
         (output_dir / sub).mkdir(parents=True, exist_ok=True)
 
     # Derive sample name
-    sample_name = derive_sample_name(reads1)
+    if sample_name is None:
+        sample_name = derive_sample_name(reads1)
     log(f"Processing sample: {sample_name}")
 
     ###########################################################################
@@ -194,12 +197,10 @@ def main():
     pairs_merged_out = int(m.group(1).replace(',', '')) if m else 0
     pct_merge_out = f"{pairs_merged_out / pairs_merged_in * 100:.2f}" if pairs_merged_in > 0 else "0.00"
 
-    merge_summary = output_dir / "stats" / "01-merge-summary.tsv"
     merge_rows = [
         ["sample", "pairs_in", "pairs_merged", "percent_merged"],
         [sample_name, str(pairs_merged_in), str(pairs_merged_out), pct_merge_out],
     ]
-    merge_summary.write_text("\n".join(["\t".join(r) for r in merge_rows]) + "\n")
 
     ###########################################################################
     # Step 3: Filter by expected errors → FASTA, label reads with sample name
@@ -238,12 +239,10 @@ def main():
 
     compress(filtered_fasta, filtered_fasta_gz)
 
-    filter_summary = output_dir / "stats" / "02-filter-summary.tsv"
     filter_rows = [
         ["sample", "reads_in", "reads_passed", "percent_passed"],
         [sample_name, str(reads_filter_in), str(reads_filter_out), pct_filter],
     ]
-    filter_summary.write_text("\n".join("\t".join(r) for r in filter_rows) + "\n")
 
     log(f"  Filtered FASTA written to: {filtered_fasta_gz}")
 
@@ -282,12 +281,10 @@ def main():
 
     log(f"  Unique sequences after dereplication: {n_unique}")
 
-    derep_summary = output_dir / "stats" / "03-derep-summary.tsv"
     derep_rows = [
         ["sample", "seqs_filtered", "seqs_unique", "percent_unique"],
         [sample_name, str(reads_filter_out), str(n_unique), pct_unique],
     ]
-    derep_summary.write_text("\n".join("\t".join(r) for r in derep_rows) + "\n")
 
     ###########################################################################
     # Step 4: Chimera detection (de novo)
@@ -334,24 +331,38 @@ def main():
     log(f"  Chimeras: {n_chimeras}  Non-chimeras: {n_nonchimeras}")
     log(f"  Abundance retained after chimera removal: {abund_chimera_checked}/{abund_derep} ({pct_abund_retained}%)")
 
-    chimera_summary = output_dir / "stats" / "04-chimera-summary.tsv"
     chimera_rows = [
         ["sample", "seqs_in", "chimeras", "nonchimeras", "pct_chimeric_seqs",
          "abund_in", "abund_nonchimeric", "pct_abund_retained"],
         [sample_name, str(n_unique), str(n_chimeras), str(n_nonchimeras), pct_chimera,
          str(abund_derep), str(abund_chimera_checked), pct_abund_retained],
     ]
-    chimera_summary.write_text("\n".join("\t".join(r) for r in chimera_rows) + "\n")
 
     if abund_derep != reads_filter_out:
         log_warn(f"Abundance mismatch: {abund_derep} != {reads_filter_out}")
 
+    # Write a single consolidated stats table for the sample
+    stats_out = output_dir / "stats" / f"{sample_name}_stats.tsv"
+    stats_header = [
+        "sample", "pairs_in", "pairs_merged", "percent_merged",
+        "reads_passed", "percent_passed", "seqs_unique", "percent_unique",
+        "chimeras", "nonchimeras", "pct_chimeric_seqs",
+        "abund_in", "abund_nonchimeric", "pct_abund_retained",
+    ]
+    stats_row = [
+        sample_name, str(pairs_merged_in), str(pairs_merged_out), pct_merge_out,
+        str(reads_filter_out), pct_filter, str(n_unique), pct_unique,
+        str(n_chimeras), str(n_nonchimeras), pct_chimera,
+        str(abund_derep), str(abund_chimera_checked), pct_abund_retained,
+    ]
+    stats_out.write_text("\t".join(stats_header) + "\n" + "\t".join(stats_row) + "\n")
+
     ###########################################################################
-    # Summary report
+    # Step 5: Write summary report
     ###########################################################################
 
     log("Generating summary report...")
-    summary_txt = output_dir / "summary_report.txt"
+    report_out = output_dir / f"{sample_name}_summary_report.txt"
 
     report = (
         f"{'=' * 80}\n"
@@ -401,7 +412,7 @@ def main():
         f"{fmt_tsv(chimera_rows)}\n"
     )
 
-    summary_txt.write_text(report)
+    report_out.write_text(report)
     # print(report)
     log("\033[0;32m2.2.1-vsearch-pipeline.py completed successfully\033[0m")
 

@@ -4,10 +4,10 @@
 // Output: per-sample dir (merged -> filtered -> derep -> chimera-checked)
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_2_2_1 {
+process MODULE_2_2_1_VSEARCH_PIPELINE {
 
-    container "ghcr.io/epereira/amp-proc/module-2.2.1:latest"
-    publishDir "${params.output_dir}/2.2.1-vsearch-pipeline",
+    container "ghcr.io/epereira/amp-proc/2.2.1-vsearch-pipeline:latest"
+    publishDir "${params.output_dir}/2.2.1-vsearch-pipeline-out",
            mode: "copy",
            enabled: params.full_output.toBoolean()
 
@@ -24,6 +24,7 @@ process MODULE_2_2_1 {
     2.2.1-vsearch-pipeline.py \
         --reads1          ${reads[0]} \
         --reads2          ${reads[1]} \
+        --sample_name     ${sample_name} \
         --output_dir      ${sample_name} \
         --nslots          ${params.nslots} \
         --min_length      ${params.vsearch_min_length} \

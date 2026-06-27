@@ -4,23 +4,23 @@
 // Output: pooled FASTA, OTU centroids, OTU table
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_2_2_2 {
+process MODULE_2_2_2_VSEARCH_PIPELINE {
 
-    container "ghcr.io/epereira/amp-proc/module-2.2.2:latest"
-    publishDir "${params.output_dir}/2.2.2-vsearch-pipeline",
+    container "ghcr.io/epereira/amp-proc/2.2.2-vsearch-pipeline:latest"
+    publishDir "${params.output_dir}/",
            mode: "copy"
 
     input:
     path samples
 
     output:
-    path "otu"
+    path "2.2.2-vsearch-pipeline-out"
 
     script:
     """
     2.2.2-vsearch-pipeline.py \
         --samples_dir  . \
-        --output_dir   otu \
+        --output_dir   2.2.2-vsearch-pipeline-out \
         --nslots       ${params.nslots} \
         --identity     ${params.identity} \
         --overwrite    t

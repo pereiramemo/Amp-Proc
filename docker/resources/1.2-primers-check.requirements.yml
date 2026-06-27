@@ -1,6 +1,7 @@
-name: amp-proc-module-2.2.3
+name: amp-proc-1.2-primers-check
 channels:
   - bioconda
   - conda-forge
 dependencies:
   - python>=3.8
+  - biopython=1.83

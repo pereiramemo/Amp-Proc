@@ -4,10 +4,10 @@
 // Output: trimmed R1/R2 (emitted downstream) + per-sample logs/stats
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_1_3 {
+process MODULE_1_3_PRIMERS_REMOVAL {
 
-    container "ghcr.io/epereira/amp-proc/module-1.3:latest"
-    publishDir "${params.output_dir}/1.3-remove-primers",
+    container "ghcr.io/epereira/amp-proc/1.3-primers-removal:latest"
+    publishDir "${params.output_dir}/1.3-primers-removal-out",
            mode: "copy",
            enabled: params.full_output.toBoolean()
 
@@ -18,16 +18,19 @@ process MODULE_1_3 {
 
     output:
     tuple val(sample_name),
-          path("${sample_name}/trimmed/*_R1_trimmed.fastq.gz"),
-          path("${sample_name}/trimmed/*_R2_trimmed.fastq.gz")
+          path("${sample_name}/output/${sample_name}_R1_trimmed.fastq.gz"),
+          path("${sample_name}/output/${sample_name}_R2_trimmed.fastq.gz"),
+          path("${sample_name}/stats/${sample_name}_stats.tsv"),
+          path("${sample_name}/logs/${sample_name}_cutadapt.log"),
+          path("${sample_name}/${sample_name}_summary_report.txt")
 
     script:
     """
-    1.3-remove-primers.py \
+    1.3-primers-removal.py \
         --reads1            ${reads[0]} \
         --reads2            ${reads[1]} \
+        --sample_name       ${sample_name} \
         --output_dir        ${sample_name} \
-        --trimmed_dir       ${sample_name}/trimmed \
         --primer_fwd        ${params.primer_fwd} \
         --primer_rev        ${params.primer_rev} \
         --nslots            ${params.nslots} \

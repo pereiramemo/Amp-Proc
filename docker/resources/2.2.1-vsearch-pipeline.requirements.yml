@@ -1,7 +1,7 @@
-name: amp-proc-module-1.3
+name: amp-proc-2.2.1-vsearch-pipeline
 channels:
   - bioconda
   - conda-forge
 dependencies:
   - python>=3.8
-  - cutadapt=4.9
+  - vsearch=2.29.1

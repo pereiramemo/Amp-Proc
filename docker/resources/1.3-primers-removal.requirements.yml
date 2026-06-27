@@ -1,7 +1,7 @@
-name: amp-proc-module-2.2.1
+name: amp-proc-1.3-primers-removal
 channels:
   - bioconda
   - conda-forge
 dependencies:
   - python>=3.8
-  - vsearch=2.29.1
+  - cutadapt=4.9

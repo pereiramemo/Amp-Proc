@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MODULE 2.2.3: OTU -> sequence-keyed count table
-// Input:  the "otu" directory produced by MODULE_2_2_2
+// Input:  the "otu" directory produced by MODULE_2_2_2_VSEARCH_PIPELINE
 // Output: DADA2-style sequence-keyed CSV (centroid sequence + per-sample counts)
-//         so OTU centroids can be annotated by MODULE_3 (3-taxa_annot.R).
+//         so OTU centroids can be annotated by MODULE_3_TAXA_ANNOT (3-taxa-annot.R).
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_2_2_3 {
+process MODULE_2_2_3_OTU_TO_SEQTABLE {
 
-    container "ghcr.io/epereira/amp-proc/module-2.2.3:latest"
+    container "ghcr.io/epereira/amp-proc/2.2.3-otu-to-seqtable:latest"
     publishDir "${params.output_dir}/2.2.3-otu-to-seqtable",
            mode: "copy",
            enabled: params.full_output.toBoolean()
