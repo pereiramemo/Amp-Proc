@@ -11,6 +11,14 @@ suppressMessages(suppressWarnings(library(dada2)))
 suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(suppressWarnings(library(ShortRead)))
 
+# Run-log buffer: log_msg() prints to console and accumulates lines for the log file # nolintr
+log_lines <- character(0)
+log_msg <- function(msg) {
+  line <- paste0("[INFO] ", msg)
+  message(line)
+  log_lines[[length(log_lines) + 1]] <<- line
+}
+
 ###############################################################################
 ### 2. Parse command line arguments
 ###############################################################################
@@ -54,7 +62,7 @@ err_plot <- TRUE
 save_workspace <- TRUE
 overwrite <- FALSE
 
-# Dev only
+# Dev only — comment out before production use
 input_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/trimmed" # nolintr
 output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.1-dada2_pipeline_output/" # nolintr
 pattern_r1 <- "_L001_R1_trimmed.fastq.gz" # nolintr
@@ -151,16 +159,22 @@ if (dir.exists(output_dir)) {
 ### 3. Create output dirs
 ###############################################################################
 
-dir.create(output_dir)
-dir.create(file.path(output_dir, "plots"))
-dir.create(file.path(output_dir, "filtered"))
-dir.create(file.path(output_dir, "tables"))
+results_dir <- file.path(output_dir, "output")
+logs_dir    <- file.path(output_dir, "logs")
+stats_dir   <- file.path(output_dir, "stats")
+
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(logs_dir, showWarnings = FALSE)
+dir.create(stats_dir, showWarnings = FALSE)
+dir.create(file.path(results_dir, "plots"), recursive = TRUE, showWarnings = FALSE) # nolintr
+dir.create(file.path(results_dir, "filtered"), showWarnings = FALSE)
+dir.create(file.path(results_dir, "tables"), showWarnings = FALSE)
 
 ###############################################################################
 ### 4. Load data
 ###############################################################################
 
-print("Loading data ...")
+log_msg("Loading data ...")
 raw_r1 <- sort(list.files(input_dir, pattern = pattern_r1, full.names = TRUE))
 raw_r2 <- sort(list.files(input_dir, pattern = pattern_r2, full.names = TRUE))
 
@@ -173,39 +187,44 @@ sample_names <- basename(raw_r1) |>
 
 if (qual_plot) {
 
-  print("Creating quality plots ...")
+  log_msg("Creating quality plots ...")
   pq_r1 <- plotQualityProfile(raw_r1)
   pq_r2 <- plotQualityProfile(raw_r2)
 
-  filename_qual_r1 <- file.path(output_dir, "plots/quality_plot_R1.pdf")
-  filename_qual_r2 <- file.path(output_dir, "plots/quality_plot_R2.pdf")
+  filename_qual_r1 <- file.path(results_dir, "plots/quality_plot_R1.pdf")
+  filename_qual_r2 <- file.path(results_dir, "plots/quality_plot_R2.pdf")
 
-  ggsave(pq_r1, device = "pdf", filename = filename_qual_r1,
-    width = 20, height = 20)
-  ggsave(pq_r2, device = "pdf", filename = filename_qual_r2,
-    width = 20, height = 20)
-
+  ggsave(pq_r1,
+         device = "pdf",
+         filename = filename_qual_r1,
+         width = 20,
+         height = 20)
+  ggsave(pq_r2,
+         device = "pdf",
+         filename = filename_qual_r2,
+         width = 20,
+         height = 20)
 }
 
 ###############################################################################
 ### 6. Quality check
 ###############################################################################
 
-print("Quality check ...")
+log_msg("Quality check ...")
 filt_r1 <- file.path(
-  output_dir, "filtered", paste(sample_names, "R1_filt.fastq.gz", sep = "_")
+  results_dir, "filtered", paste(sample_names, "R1_filt.fastq.gz", sep = "_")
 )
 filt_r2 <- file.path(
-  output_dir, "filtered", paste(sample_names, "R2_filt.fastq.gz", sep = "_")
+  results_dir, "filtered", paste(sample_names, "R2_filt.fastq.gz", sep = "_")
 )
 
 names(filt_r1) <- sample_names
 names(filt_r2) <- sample_names
 
 filter_and_trim_log <- filterAndTrim(
-  fwd = raw_r1, 
+  fwd = raw_r1,
   filt = filt_r1,
-  rev = raw_r2, 
+  rev = raw_r2,
   filt.rev = filt_r2,
   truncLen = c(trunc_r1, trunc_r2),
   maxN = 0, maxEE = c(2, 2), truncQ = 2, rm.phix = TRUE,
@@ -217,7 +236,7 @@ filter_and_trim_log <- filterAndTrim(
 ### 7. Learn error rates
 ###############################################################################
 
-print("Learning errors ...")
+log_msg("Learning errors ...")
 err_r1 <- learnErrors(filt_r1, multithread = nslots)
 err_r2 <- learnErrors(filt_r2, multithread = nslots)
 
@@ -227,17 +246,22 @@ err_r2 <- learnErrors(filt_r2, multithread = nslots)
 
 if (err_plot) {
 
-  print("Creating error plots ...")
+  log_msg("Creating error plots ...")
   pe_r1 <- plotErrors(err_r1, nominalQ = TRUE)
   pe_r2 <- plotErrors(err_r2, nominalQ = TRUE)
 
-  filename_error_r1 <- file.path(output_dir, "plots/error_plot_R1.pdf")
-  filename_error_r2 <- file.path(output_dir, "plots/error_plot_R2.pdf")
+  filename_error_r1 <- file.path(results_dir, "plots/error_plot_R1.pdf")
+  filename_error_r2 <- file.path(results_dir, "plots/error_plot_R2.pdf")
 
-  ggsave(pe_r1, device = "pdf", filename = filename_error_r1,
-    width = 10, height = 10)
-  ggsave(pe_r2, device = "pdf", filename = filename_error_r2,
-    width = 10, height = 10)
+  ggsave(pe_r1,
+         device = "pdf",
+         filename = filename_error_r1,
+         width = 10, height = 10)
+  ggsave(pe_r2,
+         device = "pdf",
+         filename = filename_error_r2,
+         width = 10,
+         height = 10)
 
 }
 
@@ -253,17 +277,17 @@ if (err_plot) {
 ### 10. Apply sample inference algorithms
 ###############################################################################
 
-print("Finding ASVs ...")
+log_msg("Finding ASVs ...")
 dada_r1 <- dada(filt_r1, err = err_r1, multithread = nslots,
-  pool = pool_option)
+                pool = pool_option)
 dada_r2 <- dada(filt_r2, err = err_r2, multithread = nslots,
-  pool = pool_option)
+                pool = pool_option)
 
 ###############################################################################
 ### 11. Merge paired reads
 ###############################################################################
 
-print("Merging ...")
+log_msg("Merging ...")
 mergers <- mergePairs(
   dada_r1, filt_r1,
   dada_r2, filt_r2,
@@ -281,13 +305,13 @@ mergers <- mergePairs(
 
 seqtab <- makeSequenceTable(mergers)
 x <- dim(seqtab)
-print(paste("asv table dim:", x[1], "x", x[2], sep = " "))
+log_msg(paste("asv table dim:", x[1], "x", x[2], sep = " "))
 
 ###############################################################################
 ### 13. Remove chimeras
 ###############################################################################
 
-print("Bimeras check ...")
+log_msg("Bimeras check ...")
 seqtab_nochim <- removeBimeraDenovo(
   seqtab,
   method = bimeras_method,
@@ -296,16 +320,16 @@ seqtab_nochim <- removeBimeraDenovo(
 )
 
 x <- dim(seqtab_nochim)
-print(paste("asv table (no bimeras) dim:", x[1], "x", x[2], sep = " "))
+log_msg(paste("asv table (no bimeras) dim:", x[1], "x", x[2], sep = " "))
 
 perc_bim <- (1 - sum(seqtab_nochim) / sum(seqtab)) * 100
-print(paste("bimeras: ", round(perc_bim, 4), "%", sep = ""))
+log_msg(paste("bimeras: ", round(perc_bim, 4), "%", sep = ""))
 
 ###############################################################################
 ### 14. Save ASV table
 ###############################################################################
 
-filename_asv <- file.path(output_dir, "asv_table.csv")
+filename_asv <- file.path(results_dir, "asv_table.csv")
 
 write.csv(x = t(seqtab_nochim), file = filename_asv)
 
@@ -313,7 +337,7 @@ write.csv(x = t(seqtab_nochim), file = filename_asv)
 ### 15. Track number of seqs
 ###############################################################################
 
-print("Creating n seq and length plots ...")
+log_msg("Creating n seq and length plots ...")
 count_seqs <- function(x) {
   sum(getUniques(x))
 }
@@ -385,8 +409,8 @@ seqlength_barplots <- ggplot(track_mergers_length_long, aes(y = length)) +
 ### 18. Save plots
 ###############################################################################
 
-filename_nseq <- file.path(output_dir, "plots/nseq_barplot.pdf")
-filename_seqlength <- file.path(output_dir, "plots/seq_length_hist.pdf")
+filename_nseq <- file.path(results_dir, "plots/nseq_barplot.pdf")
+filename_seqlength <- file.path(results_dir, "plots/seq_length_hist.pdf")
 
 ggsave(nseq_barplots, filename = filename_nseq,
   device = "pdf", width = 18, height = 30)
@@ -398,7 +422,7 @@ ggsave(seqlength_barplots, filename = filename_seqlength,
 ### 19. Save track stats tables
 ###############################################################################
 
-filename_nseq <- file.path(output_dir, "tables/nseq_counts.csv")
+filename_nseq <- file.path(results_dir, "tables/nseq_counts.csv")
 write.csv(file = filename_nseq, track_n_seqs)
 
 track_mergers_length_stats <- track_mergers_length_long |>
@@ -410,14 +434,23 @@ track_mergers_length_stats <- track_mergers_length_long |>
     min = min(length)
   )
 
-filename_seqlength_stats <- file.path(output_dir, "tables/seq_length_stats.csv")
+filename_seqlength_stats <- file.path(results_dir, "tables/seq_length_stats.csv")
 write.csv(file = filename_seqlength_stats, track_mergers_length_stats)
+
+###############################################################################
+### 19b. Save standardized stats table (read tracking through the pipeline)
+###############################################################################
+
+filename_stats <- file.path(stats_dir, "dada2_stats.tsv")
+write.table(track_n_seqs, file = filename_stats, sep = "\t",
+  row.names = FALSE, quote = FALSE)
+log_msg(sprintf("Stats table saved to: %s", filename_stats))
 
 ###############################################################################
 ### 20. Save session info
 ###############################################################################
 
-filename_session_info <- file.path(output_dir, "session_info.txt")
+filename_session_info <- file.path(results_dir, "session_info.txt")
 
 sink(filename_session_info)
 
@@ -477,7 +510,7 @@ cat(sep_major)
 
 sink()
 
-cat(sprintf("Session info saved to: %s\n", filename_session_info))
+log_msg(sprintf("Session info saved to: %s", filename_session_info))
 
 ###############################################################################
 ### 21. Save R workspace
@@ -485,7 +518,61 @@ cat(sprintf("Session info saved to: %s\n", filename_session_info))
 
 if (save_workspace) {
 
-  filename_r_data <- file.path(output_dir, ".RData")
+  filename_r_data <- file.path(results_dir, ".RData")
   save.image(file = filename_r_data)
 
 }
+
+###############################################################################
+### 22. Summary report
+###############################################################################
+
+log_msg("Generating summary report...")
+filename_report <- file.path(output_dir, "summary_report.txt")
+
+all_row <- track_n_seqs[track_n_seqs$samples == "all_samples", ]
+
+sink(filename_report)
+cat(sep_major)
+cat("DADA2 Pipeline - Summary Report\n")
+cat(sep_major)
+cat(sprintf("Date: %s\n", Sys.time()))
+cat(sprintf("Input directory:  %s\n", input_dir))
+cat(sprintf("Output directory: %s\n", output_dir))
+cat(sprintf("Samples processed: %d\n\n", length(raw_r1)))
+
+cat("Parameters:\n")
+cat(sep_minor)
+cat(sprintf("  Threads:             %d\n", nslots))
+cat(sprintf("  Truncation R1:       %d\n", trunc_r1))
+cat(sprintf("  Truncation R2:       %d\n", trunc_r2))
+cat(sprintf("  Min merge overlap:   %d\n", min_overlap))
+cat(sprintf("  Bimeras method:      %s\n", bimeras_method))
+cat(sprintf("  Pooled:              %s\n", pool_option))
+cat(sprintf("  Bimeras removed:     %.2f%%\n\n", perc_bim))
+
+cat("Output files:\n")
+cat(sep_minor)
+cat(sprintf("  ASV table:  %s\n", filename_asv))
+cat(sprintf("  Results:    %s\n", results_dir))
+cat(sprintf("  Stats:      %s\n", filename_stats))
+cat(sprintf("  Logs:       %s\n\n", logs_dir))
+
+cat(sep_major)
+cat("\nRead tracking (all samples pooled):\n\n")
+cat(sprintf("  raw:        %s\n", all_row$raw))
+cat(sprintf("  filtered:   %s\n", all_row$filtered))
+cat(sprintf("  denoisedR1: %s\n", all_row$denoisedR1))
+cat(sprintf("  denoisedR2: %s\n", all_row$denoisedR2))
+cat(sprintf("  merged:     %s\n", all_row$merged))
+cat(sprintf("  nobim:      %s\n", all_row$nobim))
+sink()
+
+###############################################################################
+### 23. Write run log
+###############################################################################
+
+log_msg("\033[0;32m2.1-dada2-pipeline.R completed successfully\033[0m")
+filename_log <- file.path(logs_dir, "dada2.log")
+ansi_re <- "\033\\[[0-9;]*m"
+writeLines(gsub(ansi_re, "", log_lines), filename_log)
