@@ -151,7 +151,7 @@ def main():
             inputs=[f"R1: {reads1}", f"R2: {reads2}"],
             params=params,
             outputs=[f"HTML report: {html_out}", f"JSON report: {json_out}"],
-            command=" ".join(str(c) for c in cmd),
+            command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
             exit_status=result.returncode,
             tool_log=result.stdout,
         ))
@@ -203,7 +203,7 @@ def main():
             f"JSON report: {json_out if json_report else 'not kept'}",
             f"Statistics: {stats_out}",
         ],
-        command=" ".join(str(c) for c in cmd),
+        command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
         exit_status=0,
         tool_log=result.stdout,
     ))

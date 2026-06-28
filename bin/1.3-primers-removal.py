@@ -174,7 +174,7 @@ def main():
             SCRIPT_NAME, SCRIPT_DESC, sample_name,
             inputs=inputs, params=params,
             outputs=[f"Trimmed R1: {r1_out}", f"Trimmed R2: {r2_out}"],
-            command=" ".join(str(c) for c in cmd),
+            command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
             exit_status=result.returncode,
             tool_log=result.stdout,
         ))
@@ -208,7 +208,7 @@ def main():
             f"Trimmed R2: {r2_out}",
             f"Statistics: {stats_out}",
         ],
-        command=" ".join(str(c) for c in cmd),
+        command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
         exit_status=0,
         tool_log=result.stdout,
     ))
