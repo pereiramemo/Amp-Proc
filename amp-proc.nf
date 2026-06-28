@@ -1,4 +1,4 @@
-#!/usr/bin/env nextflow
+#!/usr/bin/env -S nextflow run
 
 // Include modules
 include { MODULE_1_1_QUALITY_CHECK }                                from './modules/1.1-quality-check.nf'
@@ -91,14 +91,14 @@ workflow {
 
     // MODULE_1_3_PRIMERS_REMOVAL: primer removal with cutadapt
     trimmed_out = MODULE_1_3_PRIMERS_REMOVAL(reads_ch)
-    trimmed_reads = trimmed_out.map { sample_name, r1, r2, _stats, _log, _report -> tuple(sample_name, [r1, r2]) }
+    trimmed_reads = trimmed_out.map { sample_name, r1, r2, _stats, _log -> tuple(sample_name, [r1, r2]) }
 
     // MODULE_1_2_PRIMERS_CHECK: primer check after trimming (diagnostic)
     MODULE_1_2_PRIMERS_CHECK_AFTER(trimmed_reads, "1.2-primers-check-after-out")
 
     // DADA2 (ASV) branch
     if (method in ['dada2', 'both']) {
-        all_trimmed = trimmed_out.flatMap { _sample_name, r1, r2, _stats, _log, _report -> [r1, r2] }.collect()
+        all_trimmed = trimmed_out.flatMap { _sample_name, r1, r2, _stats, _log -> [r1, r2] }.collect()
         dada2_out   = MODULE_2_1_DADA2_PIPELINE(all_trimmed)
     }    
 
