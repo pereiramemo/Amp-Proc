@@ -6,12 +6,15 @@
 
 import argparse
 import gzip
-import re
+import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
+
+# Import shared helpers from bin/toolbox.py (sibling module).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from toolbox import log, log_warn, log_error, build_log
 
 # DEV ONLY — comment out before production use
 """
@@ -21,6 +24,10 @@ nslots      = 4
 identity    = 0.97
 overwrite   = True
 """
+
+SCRIPT_NAME = "2.2.2-vsearch-pipeline.py"
+SCRIPT_DESC = ("OTU construction: pool per-sample chimera-checked FASTAs -> "
+               "cluster -> OTU table.")
 
 ################################################################################
 # 2. Define functions
@@ -37,24 +44,12 @@ def parse_args():
     p.add_argument("--overwrite",        choices=["t", "f"], default="f", help="Overwrite existing output directory [default=f]")
     return p.parse_args()
 
-
-def log(msg):
-    print(f"[INFO] {msg}")
-
-def log_warn(msg):
-    print(f"\033[1;33m[WARN]\033[0m {msg}", file=sys.stderr)
-
-def log_error(msg):
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-def run(cmd, log_path=None, check=True):
+def run(cmd, check=True):
     result = subprocess.run(
         [str(c) for c in cmd],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True)
-    if log_path:
-        Path(log_path).write_text(result.stderr)
     if check and result.returncode != 0:
         log_error(f"Command failed: {' '.join(str(c) for c in cmd)}")
         if result.stderr:
@@ -67,12 +62,6 @@ def compress(src: Path, dst: Path):
         shutil.copyfileobj(f_in, f_out)
     src.unlink()
 
-def fmt_tsv(rows):
-    col_w = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
-    return "\n".join(
-        "  ".join(r[i].ljust(col_w[i]) for i in range(len(r))) for r in rows
-    )
-
 def count_fasta_seqs(fasta_path: Path) -> int:
     return sum(1 for line in open(fasta_path) if line.startswith(">"))
 
@@ -81,6 +70,11 @@ def count_fasta_seqs(fasta_path: Path) -> int:
 ################################################################################
 
 def main():
+
+    ###########################################################################
+    # Step 1: Define input variables
+    ###########################################################################
+
     opts = parse_args()
     samples_dir = Path(opts.samples_dir)
     output_dir  = Path(opts.output_dir)
@@ -89,7 +83,7 @@ def main():
     overwrite   = opts.overwrite == "t"
 
     ###########################################################################
-    # Step 0: Validate inputs, create output directories, and check dependencies
+    # Step 2: Validate inputs, create output directories, and check dependencies
     ###########################################################################
 
     if not samples_dir.is_dir():
@@ -109,22 +103,26 @@ def main():
             log_error(f"Output directory exists: {output_dir}. Use --overwrite t to overwrite.")
             sys.exit(1)
 
-    for sub in ("otus", "logs", "stats"):
-        (output_dir / sub).mkdir(parents=True, exist_ok=True)
+    results_dir = output_dir / "output"
+    logs_dir    = output_dir / "logs"
+    stats_dir   = output_dir / "stats"
+    (results_dir / "otus").mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir.mkdir(parents=True, exist_ok=True)
 
     ###########################################################################
-    # Step 1: Concatenate all chimera-checked FASTA files
+    # Step 3: Concatenate all chimera-checked FASTA files
     ###########################################################################
 
     log("Collecting chimera-checked FASTA files...")
-    fasta_files = sorted(samples_dir.glob("*/04-chimera-checked/*-04-chimera-checked.fasta.gz"))
-    all_fasta = output_dir / "all_samples.fasta"
-    all_fasta_gz = output_dir / "all_samples.fasta.gz"
-  
+    fasta_files = sorted(samples_dir.glob("*/output/04-chimera-checked/*-04-chimera-checked.fasta.gz"))
+    all_fasta = results_dir / "all_samples.fasta"
+    all_fasta_gz = results_dir / "all_samples.fasta.gz"
+
     if not fasta_files:
         log_error(
             f"No *-04-chimera-checked.fasta.gz files found under: "
-            f"{samples_dir}/*/04-chimera-checked/"
+            f"{samples_dir}/*/output/04-chimera-checked/"
         )
         sys.exit(1)
 
@@ -133,7 +131,6 @@ def main():
         log(f"    {f}")
 
     # Concatenate all samples into a single FASTA (decompress on the fly)
-    all_fasta = output_dir / "all_samples.fasta"
     with open(all_fasta, "w") as out_fh:
         for fasta_gz in fasta_files:
             with gzip.open(fasta_gz, "rt") as f_in:
@@ -146,14 +143,14 @@ def main():
     log(f"  Total sequences pooled: {n_total}")
 
     ###########################################################################
-    # Step 1: OTU clustering
+    # Step 4: OTU clustering
     ###########################################################################
 
     log(f"Step 1/1: Clustering OTUs at {identity} identity...")
 
-    otus_fasta    = output_dir / "otus" / "otus.fasta"
-    otus_fasta_gz = output_dir / "otus" / "otus.fasta.gz"
-    otu_table     = output_dir / "otus" / "otu_table.tsv"
+    otus_fasta    = results_dir / "otus" / "otus.fasta"
+    otus_fasta_gz = results_dir / "otus" / "otus.fasta.gz"
+    otu_table     = results_dir / "otus" / "otu_table.tsv"
 
     cluster_cmd = [
         "vsearch",
@@ -167,64 +164,46 @@ def main():
         "--fasta_width",  0,
         "--threads",      nslots,
     ]
-    run(cluster_cmd, log_path=output_dir / "logs" / "otu_cluster.log")
+    cluster_result = run(cluster_cmd)
 
     n_otus = count_fasta_seqs(otus_fasta)
 
     compress(otus_fasta, otus_fasta_gz)
 
     log(f"  OTUs generated: {n_otus}")
-
     log(f"  OTU table written: {otu_table}")
 
-    otu_rows = [
-        ["step",          "count"],
-        ["pooled_seqs",   str(n_total)],
-        ["otus",          str(n_otus)],
-    ]
-    stats_out = output_dir / "stats" / "otu_stats.tsv"
+    ###########################################################################
+    # Step 5: Create log and stats files
+    ###########################################################################
+
+    stats_out = stats_dir / "2.2.2-vsearch-pipeline-stats.tsv"
     stats_out.write_text(
-        "\n".join("\t".join(r) for r in otu_rows) + "\n"
+        "sample\tpooled_seqs\totus\n"
+        f"all_samples\t{n_total}\t{n_otus}\n"
     )
 
-    ###########################################################################
-    # Summary report
-    ###########################################################################
-
-    log("Generating summary report...")
-    report_out = output_dir / "otu_summary_report.txt"
-
-    report = (
-        f"{'=' * 80}\n"
-        f"VSEARCH OTU Construction Report\n"
-        f"{'=' * 80}\n"
-        f"Date: {datetime.now()}\n"
-        f"Samples directory: {samples_dir}\n"
-        f"Output directory:  {output_dir}\n"
-        f"Samples processed: {len(fasta_files)}\n"
-        f"\n"
-        f"Parameters:\n"
-        f"-----------\n"
-        f"  Threads:      {nslots}\n"
-        f"  OTU identity: {identity}\n"
-        f"\n"
-        f"Output files:\n"
-        f"-------------\n"
-        f"  Concatenated FASTA:  {all_fasta_gz}\n"
-        f"  OTU representatives: {otus_fasta_gz}\n"
-        f"  OTU table:           {otu_table}\n"
-        f"  Processing logs:     {output_dir}/logs/\n"
-        f"\n"
-        f"{'=' * 80}\n"
-        f"\n"
-        f"OTU statistics:\n"
-        f"\n"
-        f"{fmt_tsv(otu_rows)}\n"
-    )
-
-    report_out.write_text(report)
-    # print(report)
     log("\033[0;32m2.2.2-vsearch-pipeline.py completed successfully\033[0m")
+    tool_log = (
+        f"### OTU clustering\n# {' '.join(str(c) for c in cluster_cmd)}\n"
+        f"{cluster_result.stderr.rstrip()}\n"
+    )
+    log_out = logs_dir / "2.2.2-vsearch-pipeline.log"
+    log_out.write_text(build_log(
+        SCRIPT_NAME, SCRIPT_DESC, "all_samples",
+        inputs=[f"Samples directory: {samples_dir}",
+                f"Chimera-checked sample files: {len(fasta_files)}"],
+        params=[f"Threads: {nslots}", f"OTU identity: {identity}"],
+        outputs=[
+            f"Concatenated FASTA: {all_fasta_gz}",
+            f"OTU representatives: {otus_fasta_gz}",
+            f"OTU table: {otu_table}",
+            f"Statistics: {stats_out}",
+        ],
+        command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
+        exit_status=0,
+        tool_log=tool_log,
+    ))
 
 ################################################################################
 # 4. Execute

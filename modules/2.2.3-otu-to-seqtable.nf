@@ -21,8 +21,8 @@ process MODULE_2_2_3_OTU_TO_SEQTABLE {
     script:
     """
     2.2.3-otu-to-seqtable.py \
-        --otus_fasta  ${otu_dir}/otus/otus.fasta.gz \
-        --otu_table   ${otu_dir}/otus/otu_table.tsv \
+        --otus_fasta  ${otu_dir}/output/otus/otus.fasta.gz \
+        --otu_table   ${otu_dir}/output/otus/otu_table.tsv \
         --output      otu_seqtable.csv
     """
 

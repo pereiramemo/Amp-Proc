@@ -7,9 +7,14 @@
 import argparse
 import csv
 import gzip
+import os
 import re
 import sys
 from pathlib import Path
+
+# Import shared helpers from bin/toolbox.py (sibling module).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from toolbox import log, log_error
 
 # DEV ONLY — comment out before production use
 """
@@ -21,12 +26,6 @@ output     = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/05_vsea
 ################################################################################
 # 2. Define functions
 ################################################################################
-
-def log(msg):
-    print(f"[INFO] {msg}")
-
-def log_error(msg):
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
 
 def parse_args():
     p = argparse.ArgumentParser(

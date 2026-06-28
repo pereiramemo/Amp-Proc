@@ -1,17 +1,26 @@
 ###############################################################################
+### 0. Package dependencies
+###############################################################################
+
+# Functions below use Biostrings and ShortRead. Calls are namespaced
+# (pkg::fun) so the file is self-contained: sourcing it does not attach the
+# packages globally, and each function loads only what it needs (and errors
+# clearly if the package is missing). blastn_runner() and cutadapt_runner()
+# rely only on base R plus the external binaries.
+
+###############################################################################
 ### 1. Fun to create all orientations of the input sequence
 ###############################################################################
 
 all_orients <- function(PRIMER) {
-  require(Biostrings)
-  
-  DNA <- DNAString(PRIMER)  # The Biostrings works w/ DNAString objects rather than character vectors
-  
-  orients <- c(Forward = DNA, 
-               Complement = complement(DNA), 
-               Reverse = reverse(DNA), 
-               RevComp = reverseComplement(DNA))
-  
+
+  DNA <- Biostrings::DNAString(PRIMER)  # Biostrings works w/ DNAString objects rather than character vectors
+
+  orients <- c(Forward = DNA,
+               Complement = Biostrings::complement(DNA),
+               Reverse = Biostrings::reverse(DNA),
+               RevComp = Biostrings::reverseComplement(DNA))
+
   return(sapply(orients, toString))  # Convert back to character vector
 }
 
@@ -20,19 +29,19 @@ all_orients <- function(PRIMER) {
 ###############################################################################
 
 primer_hits <- function(PRIMER, INPUT) {
-  
-  nhits <- vcountPattern(pattern = PRIMER, 
-                         subject = sread(readFastq(INPUT)), 
-                         fixed = FALSE)
+
+  nhits <- Biostrings::vcountPattern(pattern = PRIMER,
+                                     subject = ShortRead::sread(ShortRead::readFastq(INPUT)),
+                                     fixed = FALSE)
   return(sum(nhits > 0))
 }
 
 
 primer_hits_fasta <- function(PRIMER, INPUT) {
-  
-  nhits <- vcountPattern(pattern = PRIMER, 
-                         subject = sread(readFasta(INPUT)), 
-                         fixed = FALSE)
+
+  nhits <- Biostrings::vcountPattern(pattern = PRIMER,
+                                     subject = ShortRead::sread(ShortRead::readFasta(INPUT)),
+                                     fixed = FALSE)
   return(sum(nhits > 0))
 }
 

@@ -12,14 +12,17 @@ import re
 import random
 import sys
 import shutil
-from datetime import datetime
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Data import IUPACData
 
+# Import shared helpers from bin/toolbox.py (sibling module).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from toolbox import log, log_warn, log_error, derive_sample_name, build_log
+
 # DEV ONLY — comment out before production use
-""" 
+"""
 reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
 reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
 output_dir = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/02_check_primers_before/sample1")
@@ -28,35 +31,13 @@ primer_fwd = "GTGYCAGCMGCCGCGGTAA"
 primer_rev = "CCGYCAATTYMTTTRAGTTT"
 subsample_size = 100
  """
+
+SCRIPT_NAME = "1.2-primers-check.py"
+SCRIPT_DESC = "Subsample reads and count IUPAC-aware primer hits in all orientations."
+
 ################################################################################
 # 2. Define functions
 ################################################################################
-
-_log_buffer = []
-_ANSI_RE = re.compile(r'\033\[[0-9;]*m')
-
-def log(msg):
-    line = f"[INFO] {msg}"
-    print(line)
-    _log_buffer.append(_ANSI_RE.sub('', line))
-
-def log_warn(msg):
-    line = f'[WARN] {msg}'
-    print(f"\033[1;33m{line}\033[0m", file=sys.stderr)
-    _log_buffer.append(_ANSI_RE.sub('', line))
-
-def log_error(msg):
-    line = f"[ERROR] {msg}"
-    print(f"\033[0;31m{line}\033[0m", file=sys.stderr)
-    _log_buffer.append(_ANSI_RE.sub('', line))
-
-
-def fmt_tsv(rows):
-    col_w = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
-    return "\n".join(
-        "  ".join(r[i].ljust(col_w[i]) for i in range(len(r))) for r in rows
-    )
-
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -122,6 +103,10 @@ def write_table(data_dict, out_file):
 
 def main():
 
+    ###########################################################################
+    # Step 1: Define input variables
+    ###########################################################################
+
     opts = parse_args()
     reads1 = opts.reads1
     reads2 = opts.reads2
@@ -134,7 +119,7 @@ def main():
     overwrite = opts.overwrite == "t"
 
     ###########################################################################
-    # Step 0: Validate inputs and create output directories
+    # Step 2: Validate inputs and create output directories
     ###########################################################################
 
     # Validate input files
@@ -147,11 +132,7 @@ def main():
 
     # Derive sample name from R1 filename if not provided
     if sample_name is None:
-        sample_name = Path(reads1).name
-        for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
-            if sample_name.endswith(ext):
-                sample_name = sample_name[: -len(ext)]
-                break
+        sample_name = derive_sample_name(reads1)
 
     # Check if output directory exists and handle overwrite option
     if output_dir.exists():
@@ -163,16 +144,18 @@ def main():
             sys.exit(1)
 
     # Create output directories
-    primer_check_dir = output_dir / "output"
-    logs_dir  = output_dir / "logs"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    primer_check_dir.mkdir(parents=True, exist_ok=True)
+    results_dir = output_dir / "output"
+    logs_dir    = output_dir / "logs"
+    stats_dir   = output_dir / "stats"
+    results_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
-    primer_check_out = primer_check_dir / f"{sample_name}_primer-check.tsv"
-    log_out  = logs_dir  / f"{sample_name}_primers-check.log"
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    primer_check_out = results_dir / f"{sample_name}_primer-check.tsv"
+    log_out   = logs_dir  / f"1.2-primers-check-{sample_name}.log"
+    stats_out = stats_dir / f"1.2-primers-check-{sample_name}-stats.tsv"
 
     ###########################################################################
-    # Step 1: Obtain all orientations of the primers and compile regex patterns
+    # Step 3: Obtain all orientations of the primers and compile regex patterns
     ###########################################################################
 
     log(f"Processing sample: {sample_name}")
@@ -193,7 +176,7 @@ def main():
         log(f"  RevPrimer.{orient_name}: {seq}")
 
     ###########################################################################
-    # Step 2: Read and subsample
+    # Step 4: Read and subsample
     ###########################################################################
 
     with open_maybe_gzip(reads1) as handle:
@@ -211,7 +194,7 @@ def main():
     log(f"Subsampled reads: R1={len(seqs1)} R2={len(seqs2)} (cap {subsample_size})")
 
     ###########################################################################
-    # Step 3: Count primer hits
+    # Step 5: Count primer hits
     ###########################################################################
 
     hit_counts = {}
@@ -233,7 +216,7 @@ def main():
     })
 
     ###########################################################################
-    # Step 4: Calculate percentages
+    # Step 4: Calculate percentages and write the main output table
     ###########################################################################
 
     if raw_counts:
@@ -245,10 +228,8 @@ def main():
         display_vals = perc
 
     ###########################################################################
-    # Step 5: Write summary report
+    # Step 5: Create log and stats files
     ###########################################################################
-
-    log("Generating summary report...")
 
     # Key orientations: expected signal in a well-prepared library
     key_keys = [
@@ -257,45 +238,33 @@ def main():
         "RevReads.RevPrimer.Forward",
         "RevReads.FwdPrimer.RevComp",
     ]
-    unit = "counts" if raw_counts else "%"
-    stat_rows = [["orientation", unit]] + [
-        [k, str(display_vals[k])] for k in key_keys if k in display_vals
-    ]
+    present_keys = [k for k in key_keys if k in display_vals]
+    stats_header = ["sample"] + present_keys
+    stats_row = [sample_name] + [str(display_vals[k]) for k in present_keys]
+    with open(stats_out, "w", newline="") as fh:
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        writer.writerow(stats_header)
+        writer.writerow(stats_row)
 
-    report_out = output_dir / f"{sample_name}_summary_report.txt"
-    report = (
-        f"{'=' * 80}\n"
-        f"Primer Check Report\n"
-        f"{'=' * 80}\n"
-        f"Date:             {datetime.now()}\n"
-        f"Sample:           {sample_name}\n"
-        f"R1:               {reads1}\n"
-        f"R2:               {reads2}\n"
-        f"Output directory: {output_dir}\n"
-        f"\n"
-        f"Parameters:\n"
-        f"-----------\n"
-        f"  Forward primer:  {primer_fwd}\n"
-        f"  Reverse primer:  {primer_rev}\n"
-        f"  Subsample size:  {subsample_size}\n"
-        f"  Output format:   {'raw counts' if raw_counts else 'percentages'}\n"
-        f"\n"
-        f"Output files:\n"
-        f"-------------\n"
-        f"  Statistics:           {primer_check_out}\n"
-        f"  Log (incl. primers):  {log_out}\n"
-        f"\n"
-        f"{'=' * 80}\n"
-        f"\n"
-        f"Key primer hit statistics:\n"
-        f"\n"
-        f"{fmt_tsv(stat_rows)}\n"
-    )
-
-    report_out.write_text(report)
-    # print(report)
     log("\033[0;32m1.2-primers-check.py completed successfully\033[0m")
-    log_out.write_text("\n".join(_log_buffer) + "\n")
+
+    unit = "raw counts" if raw_counts else "percentages"
+    log_out.write_text(build_log(
+        SCRIPT_NAME, SCRIPT_DESC, sample_name,
+        inputs=[f"R1: {reads1}", f"R2: {reads2}"],
+        params=[
+            f"Forward primer: {primer_fwd}",
+            f"Reverse primer: {primer_rev}",
+            f"Subsample size: {subsample_size}",
+            f"Output format: {unit}",
+        ],
+        outputs=[
+            f"Primer-check table: {primer_check_out}",
+            f"Statistics: {stats_out}",
+        ],
+        command=" ".join([SCRIPT_NAME] + sys.argv[1:]),
+        exit_status=0,
+    ))
 
 ################################################################################
 # 4. Execute

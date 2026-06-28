@@ -20,9 +20,8 @@ process MODULE_1_3_PRIMERS_REMOVAL {
     tuple val(sample_name),
           path("${sample_name}/output/${sample_name}_R1_trimmed.fastq.gz"),
           path("${sample_name}/output/${sample_name}_R2_trimmed.fastq.gz"),
-          path("${sample_name}/stats/${sample_name}_stats.tsv"),
-          path("${sample_name}/logs/${sample_name}_cutadapt.log"),
-          path("${sample_name}/${sample_name}_summary_report.txt")
+          path("${sample_name}/stats/1.3-primers-removal-${sample_name}-stats.tsv"),
+          path("${sample_name}/logs/1.3-primers-removal-${sample_name}.log")
 
     script:
     """

@@ -10,16 +10,24 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
+# Import shared helpers from bin/toolbox.py (sibling module).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from toolbox import log, log_warn, log_error, derive_sample_name, build_log
+
 # DEV ONLY — comment out before production use
-""" reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+"""
+reads1 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
 reads2 = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
-output_dir = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/01_fastp/sample1"
+output_dir = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/01_fastp/sample1")
 nslots = 4
 overwrite = True
  """
+
+SCRIPT_NAME = "1.1-quality-check.py"
+SCRIPT_DESC = "Run a fastp QC report on a single paired-end sample (no filtering applied)."
+
 ################################################################################
 # 2. Define Functions
 ################################################################################
@@ -38,24 +46,16 @@ def parse_args():
     p.add_argument("--overwrite",                 choices=["t", "f"], default="f", help="Overwrite existing output directory [default=f]")
     return p.parse_args()
 
-
-def log(msg):
-    print(f"[INFO] {msg}")
-
-def log_warn(msg):
-    print(f"\033[1;33m[WARN]\033[0m {msg}", file=sys.stderr)
-
-def log_error(msg):
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-def derive_sample_name(reads1: str) -> str:
-    name = Path(reads1).name
-    for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
-        if name.endswith(ext):
-            return name[: -len(ext)]
-    return name
+################################################################################
+# 3. Define main function
+################################################################################
 
 def main():
+
+    ###########################################################################
+    # Step 1: Define input variables
+    ###########################################################################
+
     opts = parse_args()
     reads1 = opts.reads1
     reads2 = opts.reads2
@@ -65,6 +65,10 @@ def main():
     html_report = opts.html_report == "t"
     json_report = opts.json_report == "t"
     overwrite = opts.overwrite == "t"
+
+    ###########################################################################
+    # Step 2: Validate input files and tools, and define and create output directories
+    ###########################################################################
 
     # Validate input files
     if not os.path.isfile(reads1):
@@ -89,10 +93,10 @@ def main():
             log_error(f"Output directory exists: {output_dir}. Use --overwrite t to overwrite.")
             sys.exit(1)
 
-    reports_dir = output_dir / "outputs"
+    results_dir = output_dir / "output"
     stats_dir   = output_dir / "stats"
     logs_dir    = output_dir / "logs"
-    reports_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
     stats_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -102,9 +106,14 @@ def main():
     log(f"Processing sample: {sample_name}")
 
     # Paths for fastp outputs
-    html_out = reports_dir / f"{sample_name}_fastp.html"
-    json_out = reports_dir / f"{sample_name}_fastp.json"
-    log_out  = logs_dir    / f"{sample_name}_fastp.log"
+    html_out  = results_dir / f"{sample_name}_fastp.html"
+    json_out  = results_dir / f"{sample_name}_fastp.json"
+    log_out   = logs_dir    / f"1.1-quality-check-{sample_name}.log"
+    stats_out = stats_dir   / f"1.1-quality-check-{sample_name}-stats.tsv"
+
+    ###########################################################################
+    # Step 3: Build and execute fastp command
+    ###########################################################################
 
     # Build fastp command
     cmd = [
@@ -123,17 +132,34 @@ def main():
     else:
         cmd += ["--html", "/dev/null"]
 
+    params = [f"Threads: {nslots}", "Mode: report only (no filtering applied)"]
+
     # Run fastp
     log("Running fastp...")
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, 
+    result = subprocess.run(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True)
     print(result.stdout, end="")
-    with open(log_out, "w") as fh:
-        fh.write(result.stdout)
+
+    ###########################################################################
+    # Step 4: Check fastp result
+    ###########################################################################
 
     if result.returncode != 0:
         log_error(f"fastp failed for sample {sample_name}")
+        log_out.write_text(build_log(
+            SCRIPT_NAME, SCRIPT_DESC, sample_name,
+            inputs=[f"R1: {reads1}", f"R2: {reads2}"],
+            params=params,
+            outputs=[f"HTML report: {html_out}", f"JSON report: {json_out}"],
+            command=" ".join(str(c) for c in cmd),
+            exit_status=result.returncode,
+            tool_log=result.stdout,
+        ))
         sys.exit(1)
+
+    ###########################################################################
+    # Step 5: Create log and stats files
+    ###########################################################################
 
     # Extract summary statistics from JSON
     with open(json_out) as f:
@@ -149,8 +175,7 @@ def main():
     r2_mean_length = bf["read2_mean_length"]
     gc_content     = bf["gc_content"]
 
-    # Write summary TSV
-    stats_out = stats_dir / f"{sample_name}_stats.tsv"
+    # Write summary TSV (samples as rows, statistics as columns)
     header = "\t".join([
         "sample", "total_reads", "total_bases",
         "q20_bases", "q20_rate", "q30_bases", "q30_rate",
@@ -166,53 +191,25 @@ def main():
     if not json_report:
         json_out.unlink(missing_ok=True)
 
-    # Generate human-readable summary report
-    log("Generating summary report...")
-    report_out = output_dir / f"{sample_name}_summary_report.txt"
-
-    tsv_rows = [header.split("\t"), row.split("\t")]
-    col_w = [max(len(r[i]) for r in tsv_rows) for i in range(len(tsv_rows[0]))]
-    tsv_formatted = "\n".join(
-        "  ".join(r[i].ljust(col_w[i]) for i in range(len(r)))
-        for r in tsv_rows
-    )
-
-    report = (
-        f"{'=' * 80}\n"
-        f"Quality Check Report - fastp\n"
-        f"{'=' * 80}\n"
-        f"Date: {datetime.now()}\n"
-        f"Sample: {sample_name}\n"
-        f"R1: {reads1}\n"
-        f"R2: {reads2}\n"
-        f"Output directory: {output_dir}\n"
-        f"\n"
-        f"Parameters:\n"
-        f"-----------\n"
-        f"Threads: {nslots}\n"
-        f"Mode: Report only (no filtering applied)\n"
-        f"\n"
-        f"Output files:\n"
-        f"-------------\n"
-        f"- HTML report: {html_out}\n"
-        f"- JSON report: {json_out}\n"
-        f"- Processing log: {log_out}\n"
-        f"- Summary statistics: {stats_out}\n"
-        f"- This report: {report_out}\n"
-        f"\n"
-        f"{'=' * 80}\n"
-        f"\n"
-        f"Summary Statistics:\n"
-        f"\n"
-        f"{tsv_formatted}\n"
-    )
-
-    report_out.write_text(report)
-    # print(report)
     log("\033[0;32m1.1-quality-check.py completed successfully\033[0m")
-    
+
+    # Write the standardized log file (general info + fastp log)
+    log_out.write_text(build_log(
+        SCRIPT_NAME, SCRIPT_DESC, sample_name,
+        inputs=[f"R1: {reads1}", f"R2: {reads2}"],
+        params=params,
+        outputs=[
+            f"HTML report: {html_out}",
+            f"JSON report: {json_out if json_report else 'not kept'}",
+            f"Statistics: {stats_out}",
+        ],
+        command=" ".join(str(c) for c in cmd),
+        exit_status=0,
+        tool_log=result.stdout,
+    ))
+
 ################################################################################
-# 3. Execute main function
+# 4. Execute main function
 ################################################################################
 
 if __name__ == "__main__":
