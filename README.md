@@ -4,8 +4,7 @@ This repository provides a containerized [Nextflow](https://www.nextflow.io/)
 pipeline for quality checking, preprocessing, denoising/clustering, and taxonomic
 annotation of amplicon sequencing data. Each step is a Nextflow process (under
 `modules/`) that wraps a Python or R script in `bin/` and runs in its own Docker
-image. The pipeline mirrors the structure and conventions of
-[Mg-Clust](https://github.com/pereiramemo/Mg-Clust).
+image.
 
 Two denoising/clustering strategies are available and can be used interchangeably
 (or together), selected with `--method`: **DADA2** (Amplicon Sequence Variants,
@@ -26,7 +25,6 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 │   ├── 2.1-dada2-pipeline.R                # DADA2 ASV pipeline
 │   ├── 2.2.1-vsearch-pipeline.py           # VSEARCH per-sample processing
 │   ├── 2.2.2-vsearch-pipeline.py           # VSEARCH OTU clustering
-│   ├── 2.2.3-otu-to-seqtable.py            # OTU -> sequence-keyed table (for taxonomy)
 │   ├── 3-taxa-annot.R                      # Taxonomic annotation
 │   ├── toolbox.py                          # Shared Python helpers
 │   └── toolbox.R                           # Shared R helpers
@@ -80,7 +78,6 @@ has no network access).
 | `MODULE_2_1_DADA2_PIPELINE`    | `2.1-dada2-pipeline.R`     | DADA2 ASV inference (filter → denoise → merge → de-chimera) |
 | `MODULE_2_2_1_VSEARCH_PIPELINE`| `2.2.1-vsearch-pipeline.py`| Per-sample merge → EE filter → derep → chimera check |
 | `MODULE_2_2_2_VSEARCH_PIPELINE`| `2.2.2-vsearch-pipeline.py`| Pool samples → cluster OTUs → OTU table |
-| `MODULE_2_2_3_OTU_TO_SEQTABLE` | `2.2.3-otu-to-seqtable.py` | OTU centroids → sequence-keyed table for taxonomy |
 | `MODULE_3_TAXA_ANNOT`          | `3-taxa-annot.R`           | Taxonomy (NBC / NBCandEM) for ASVs and/or OTUs |
 
 Each step writes a standardized layout under its publish directory: `output/`
@@ -99,9 +96,9 @@ denoising branch:
 
 `MODULE_1_1_QUALITY_CHECK` (fastp QC) and `MODULE_1_2_PRIMERS_CHECK` (primer check, before and
 after) are diagnostic and always run. Taxonomic annotation (`MODULE_3_TAXA_ANNOT`) runs on
-the ASV table and/or the OTU centroids when `--skip_tax_annot false` is set; for the
-OTU branch, `MODULE_2_2_3_OTU_TO_SEQTABLE` first rebuilds a sequence-keyed count table from
-the OTU centroids so the same `3-taxa-annot.R` script can be reused unchanged.
+the ASV table and/or the OTU table when `--skip_tax_annot false` is set. Both are
+sequence-keyed count tables (the VSEARCH OTU table is relabelled by sequence via
+`--relabel_self`), so the same `3-taxa-annot.R` script handles either unchanged.
 
 ## Run
 
