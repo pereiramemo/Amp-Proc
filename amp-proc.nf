@@ -8,7 +8,6 @@ include { MODULE_1_3_PRIMERS_REMOVAL }                                from './mo
 include { MODULE_2_1_DADA2_PIPELINE }                                from './modules/2.1-dada2-pipeline.nf'
 include { MODULE_2_2_1_VSEARCH_PIPELINE }                              from './modules/2.2.1-vsearch-pipeline.nf'
 include { MODULE_2_2_2_VSEARCH_PIPELINE }                              from './modules/2.2.2-vsearch-pipeline.nf'
-include { MODULE_2_2_3_OTU_TO_SEQTABLE }                              from './modules/2.2.3-otu-to-seqtable.nf'
 include { MODULE_3_TAXA_ANNOT as MODULE_3_TAXA_ANNOT_ASV }                  from './modules/3-taxa-annot.nf'
 include { MODULE_3_TAXA_ANNOT as MODULE_3_TAXA_ANNOT_OTU }                  from './modules/3-taxa-annot.nf'
 
@@ -19,7 +18,7 @@ workflow {
         log.info """
         Amp-Proc: amplicon processing from paired-end reads to ASV/OTU tables
 
-        Usage: nextflow run main.nf [options]
+        Usage: nextflow run amp-proc.nf [options]
 
         General:
           --input_dir       DIR   Input directory with paired-end FASTQ files (default: ${params.input_dir})
@@ -62,9 +61,7 @@ workflow {
           --identity        NUM   OTU clustering identity 0-1 (default: ${params.identity})
 
         MODULE_3_TAXA_ANNOT — taxonomic annotation (SILVA):
-          --taxa_method     STR   NBC | NBCandEM | BLAST (default: ${params.taxa_method})
-          --evalue          NUM   BLAST e-value (default: ${params.evalue})
-          --min_identity    NUM   BLAST min identity (default: ${params.min_identity})
+          --taxa_method     STR   NBC | NBCandEM (default: ${params.taxa_method})
           --train_db        PATH  NBC training database (default: ${params.train_db})
           --ref_db          PATH  EM reference database (default: ${params.ref_db})
         """.stripIndent()
@@ -90,36 +87,35 @@ workflow {
     MODULE_1_2_PRIMERS_CHECK_BEFORE(reads_ch, "1.2-primers-check-before-out")
 
     // MODULE_1_3_PRIMERS_REMOVAL: primer removal with cutadapt
-    trimmed_out = MODULE_1_3_PRIMERS_REMOVAL(reads_ch)
-    trimmed_reads = trimmed_out.map { sample_name, r1, r2, _stats, _log -> tuple(sample_name, [r1, r2]) }
+    module_1_3_primers_removal_out = MODULE_1_3_PRIMERS_REMOVAL(reads_ch)
+    trimmed_reads = module_1_3_primers_removal_out.map { sample_name, r1, r2, _stats, _log -> tuple(sample_name, [r1, r2]) }
 
     // MODULE_1_2_PRIMERS_CHECK: primer check after trimming (diagnostic)
     MODULE_1_2_PRIMERS_CHECK_AFTER(trimmed_reads, "1.2-primers-check-after-out")
 
     // DADA2 (ASV) branch
     if (method in ['dada2', 'both']) {
-        all_trimmed = trimmed_out.flatMap { _sample_name, r1, r2, _stats, _log -> [r1, r2] }.collect()
-        dada2_out   = MODULE_2_1_DADA2_PIPELINE(all_trimmed)
-    }    
-
-  // MODULE_3_TAXA_ANNOT: taxonomic annotation of the ASV table
-  //      if (!params.skip_tax_annot.toBoolean()) {
-  //          MODULE_3_TAXA_ANNOT_ASV(dada2_out.asv_table.map { tbl -> tuple("asv", tbl) })
-  //      }
-  //  }
+        all_trimmed = module_1_3_primers_removal_out.flatMap { _sample_name, r1, r2, _stats, _log -> [r1, r2] }.collect()
+        module_2_1_dada2_pipeline_out = MODULE_2_1_DADA2_PIPELINE(all_trimmed)
+     
+        // MODULE_3_TAXA_ANNOT: taxonomic annotation of the ASV table
+        if (!params.skip_tax_annot.toBoolean()) {
+            asv_table = module_2_1_dada2_pipeline_out.asv_table
+            MODULE_3_TAXA_ANNOT_ASV(asv_table.map { tbl -> tuple("csv", "asv", tbl) })
+        }
+    }
 
     // VSEARCH (OTU) branch
     if (method in ['vsearch', 'both']) {
-        vsearch_sample = MODULE_2_2_1_VSEARCH_PIPELINE(trimmed_reads)
-        all_samples    = vsearch_sample.collect()
-        otu_out        = MODULE_2_2_2_VSEARCH_PIPELINE(all_samples)
-    }    
+        module_2_2_1_vsearch_pipeline_out = MODULE_2_2_1_VSEARCH_PIPELINE(trimmed_reads)
+        all_samples    = module_2_2_1_vsearch_pipeline_out.collect()
+        module_2_2_2_vsearch_pipeline_out = MODULE_2_2_2_VSEARCH_PIPELINE(all_samples)
 
         // MODULE_3_TAXA_ANNOT: taxonomic annotation of the OTU centroids
-  //      if (!params.skip_tax_annot.toBoolean()) {
-  //          otu_seqtable = MODULE_2_2_3_OTU_TO_SEQTABLE(otu_out)
-  //          MODULE_3_TAXA_ANNOT_OTU(otu_seqtable.map { tbl -> tuple("otu", tbl) })
-  //      }
- //   }
+        if (!params.skip_tax_annot.toBoolean()) {
+            otu_table = module_2_2_2_vsearch_pipeline_out.otu_table
+            MODULE_3_TAXA_ANNOT_OTU(otu_table.map { tbl -> tuple("tsv", "otu", tbl) })
+        }
+    }    
 
 }
