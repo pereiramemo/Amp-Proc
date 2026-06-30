@@ -29,6 +29,7 @@ workflow {
           --full_output     BOOL  Publish all intermediate outputs (default: ${params.full_output})
           --skip_tax_annot  BOOL  Skip MODULE_3_TAXA_ANNOT taxonomic annotation (default: ${params.skip_tax_annot})
           --maxForks        INT   Max parallel process instances (default: ${params.maxForks})
+          --container_tag   STR   Tag of the ghcr.io/pereiramemo/amp-proc/* images to pull (default: ${params.container_tag})
 
         Primers (MODULE_1_2_PRIMERS_CHECK, MODULE_1_3_PRIMERS_REMOVAL):
           --primer_fwd      STR   Forward primer 5'->3' (default: ${params.primer_fwd})
