@@ -19,7 +19,7 @@ process MODULE_3_TAXA_ANNOT {
     tuple val(table_delim), val(label), path(seq_table)
 
     output:
-    path "3-taxa-annot-${label}-out",                                        emit: dir
+    path "3-taxa-annot-${label}-out",         emit: dir
 
     script:
     """

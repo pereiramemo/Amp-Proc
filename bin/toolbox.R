@@ -93,9 +93,19 @@ count_seqs <- function(x) {
 
 
 db_dir_default <- file.path(path.expand("~"), ".amp-proc", "db")
+# Known DADA2-formatted SILVA references, keyed by basename. Two versions are
+# supported (note the differing file-naming schemes between releases):
+#   - v138.1  -> Zenodo record 4587955 (https://zenodo.org/record/4587955)
+#   - v138.2  -> Zenodo record 14169026 (https://zenodo.org/records/14169026)
 db_registry <- c(
-  "silva_nr99_v138.1_train_set.fa.gz"     = "https://zenodo.org/record/4587955/files/silva_nr99_v138.1_train_set.fa.gz?download=1", # nolint
-  "silva_species_assignment_v138.1.fa.gz" = "https://zenodo.org/record/4587955/files/silva_species_assignment_v138.1.fa.gz?download=1" # nolint
+  # SILVA v138.1
+  "silva_nr99_v138.1_train_set.fa.gz"          = "https://zenodo.org/record/4587955/files/silva_nr99_v138.1_train_set.fa.gz?download=1", # nolint
+  "silva_nr99_v138.1_wSpecies_train_set.fa.gz" = "https://zenodo.org/record/4587955/files/silva_nr99_v138.1_wSpecies_train_set.fa.gz?download=1", # nolint
+  "silva_species_assignment_v138.1.fa.gz"      = "https://zenodo.org/record/4587955/files/silva_species_assignment_v138.1.fa.gz?download=1", # nolint
+  # SILVA v138.2
+  "silva_nr99_v138.2_toGenus_trainset.fa.gz"   = "https://zenodo.org/records/14169026/files/silva_nr99_v138.2_toGenus_trainset.fa.gz?download=1", # nolint
+  "silva_nr99_v138.2_toSpecies_trainset.fa.gz" = "https://zenodo.org/records/14169026/files/silva_nr99_v138.2_toSpecies_trainset.fa.gz?download=1", # nolint
+  "silva_v138.2_assignSpecies.fa.gz"           = "https://zenodo.org/records/14169026/files/silva_v138.2_assignSpecies.fa.gz?download=1" # nolint
 )
 
 ensure_database <- function(db, db_dir = db_dir_default, 

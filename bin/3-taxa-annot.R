@@ -31,8 +31,9 @@ show_usage <- function() {
   cat("--output_dir CHAR               directory to output generated data (required)\n") # nolint
   cat("--method CHAR                   annotation method: NBC, NBCandEM (default: NBC)\n") # nolint
   cat("                                NBC: Naive Bayes Classifier; EM: Exact Matching\n") # nolint
-  cat("--train_db CHAR                 training database to run NBC (default: silva_nr99_v138.1_train_set.fa.gz)\n") # nolint
-  cat("--ref_db CHAR                   reference database to run EM (default: silva_species_assignment_v138.1.fa.gz)\n") # nolint
+  cat("--train_db CHAR                 training database to run NBC (default: silva_nr99_v138.2_toGenus_trainset.fa.gz)\n") # nolint
+  cat("                                SILVA v138.1/v138.2 references are auto-downloaded by basename (see db_registry in toolbox.R)\n") # nolint
+  cat("--ref_db CHAR                   reference database to run EM (default: silva_v138.2_assignSpecies.fa.gz)\n") # nolint
   cat("--nslots NUM                    number of threads used (default: 12)\n")
   cat("--save_workspace                save R workspace image (default: TRUE)\n") # nolint
   cat("--no_save_workspace             disable saving workspace\n")
@@ -44,8 +45,8 @@ input_asv_table <- NULL
 table_delim <- "csv"
 output_dir <- NULL
 method <- "NBC"
-train_db <- "silva_nr99_v138.1_train_set.fa.gz"
-ref_db <- "silva_species_assignment_v138.1.fa.gz"
+train_db <- "silva_nr99_v138.2_toGenus_trainset.fa.gz"
+ref_db <- "silva_v138.2_assignSpecies.fa.gz"
 nslots <- 12
 save_workspace <- TRUE
 overwrite <- FALSE
