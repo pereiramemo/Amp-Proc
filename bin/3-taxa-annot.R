@@ -52,10 +52,10 @@ save_workspace <- TRUE
 overwrite <- FALSE
 
 # Dev only — comment out before production use
-input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
-input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
-output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
-method <- "NBCandEM" # nolint
+# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
+# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
+# output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
+# method <- "NBCandEM" # nolint
 
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1
