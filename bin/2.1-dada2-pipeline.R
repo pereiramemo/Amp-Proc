@@ -64,10 +64,10 @@ save_workspace <- TRUE
 overwrite <- FALSE
 
 # Dev only — comment out before production use
-input_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/input_data/" # nolintr
-output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.1-dada2_pipeline_output/" # nolintr
-pattern_r1 <- "_L001_R1_trimmed.fastq.gz" # nolintr
-pattern_r2 <- "_L001_R2_trimmed.fastq.gz" # nolintr
+# input_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/input_data/" # nolintr
+# output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.1-dada2_pipeline_output/" # nolintr
+# pattern_r1 <- "_L001_R1_trimmed.fastq.gz" # nolintr
+# pattern_r2 <- "_L001_R2_trimmed.fastq.gz" # nolintr
 
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1

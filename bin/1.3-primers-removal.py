@@ -17,7 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from toolbox import log, log_warn, log_error, derive_sample_name, build_log
 
 # DEV ONLY — comment out before production use
-""" reads1      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
+""" 
+reads1      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R1_001_redu.fastq.gz"
 reads2      = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/data/1-samo1_S1_L001_R2_001_redu.fastq.gz"
 output_dir  = "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/03_primer_removal/sample1"
 primer_fwd  = "GTGYCAGCMGCCGCGGTAA"
