@@ -17,7 +17,7 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 .
 ├── LICENSE                                 # License file
 ├── README.md                               # This file
-├── main.nf                                 # Nextflow workflow entry point
+├── amp-proc.nf                                 # Nextflow workflow entry point
 ├── nextflow.config                         # Nextflow parameters and Docker settings
 ├── bin/                                    # Step scripts (auto-staged onto PATH)
 │   ├── 1.1-quality-check.py                # Quality check with fastp
@@ -81,7 +81,7 @@ has no network access).
 | `MODULE_2_2_1_VSEARCH_PIPELINE`| `2.2.1-vsearch-pipeline.py`| Per-sample merge → EE filter → derep → chimera check |
 | `MODULE_2_2_2_VSEARCH_PIPELINE`| `2.2.2-vsearch-pipeline.py`| Pool samples → cluster OTUs → OTU table |
 | `MODULE_2_2_3_OTU_TO_SEQTABLE` | `2.2.3-otu-to-seqtable.py` | OTU centroids → sequence-keyed table for taxonomy |
-| `MODULE_3_TAXA_ANNOT`          | `3-taxa-annot.R`           | Taxonomy (NBC / NBCandEM / BLAST) for ASVs and/or OTUs |
+| `MODULE_3_TAXA_ANNOT`          | `3-taxa-annot.R`           | Taxonomy (NBC / NBCandEM) for ASVs and/or OTUs |
 
 Each step writes a standardized layout under its publish directory: `output/`
 (main results), `logs/` (a log file with a general-info header followed by any
@@ -107,18 +107,18 @@ the OTU centroids so the same `3-taxa-annot.R` script can be reused unchanged.
 
 ```bash
 # Quick test with the bundled data (denoising only; taxonomy needs reference DBs)
-nextflow run main.nf
+nextflow run amp-proc.nf
 
 # Choose a single branch
-nextflow run main.nf --method vsearch
+nextflow run amp-proc.nf --method vsearch
 
 # Enable taxonomic annotation (SILVA v138.1 DBs auto-download to ~/.amp-proc/db/ if missing)
-nextflow run main.nf --skip_tax_annot false \
+nextflow run amp-proc.nf --skip_tax_annot false \
     --train_db ~/.amp-proc/db/silva_nr99_v138.1_train_set.fa.gz \
     --ref_db   ~/.amp-proc/db/silva_species_assignment_v138.1.fa.gz
 
 # On your own data
-nextflow run main.nf \
+nextflow run amp-proc.nf \
     --input_dir     /path/to/fastq \
     --reads_pattern '*_R{1,2}_001.fastq.gz' \
     --output_dir    /path/to/results \
@@ -127,7 +127,7 @@ nextflow run main.nf \
     --nslots        16
 
 # Full parameter listing
-nextflow run main.nf --help
+nextflow run amp-proc.nf --help
 ```
 
 Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container from `~/.amp-proc`
@@ -161,7 +161,6 @@ install manually beyond Nextflow and Docker (see [Installation](#installation)).
 | [fastp](https://github.com/OpenGene/fastp) | Read quality control |
 | [cutadapt](https://cutadapt.readthedocs.io/) | Primer removal |
 | [vsearch](https://github.com/torognes/vsearch) | PE merging, dereplication, chimera checking, OTU clustering |
-| [BLAST+](https://blast.ncbi.nlm.nih.gov/) | BLAST-based taxonomic annotation |
 | [Python 3](https://www.python.org/) + [BioPython](https://biopython.org/) | Primer checking, OTU table bridging |
 | [R](https://www.r-project.org/) ≥ 4.0 | DADA2 pipeline and taxonomic annotation |
 | [DADA2](https://benjjneb.github.io/dada2/) | ASV inference and NBC taxonomy |

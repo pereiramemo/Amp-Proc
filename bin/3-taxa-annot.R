@@ -51,10 +51,10 @@ save_workspace <- TRUE
 overwrite <- FALSE
 
 # Dev only — comment out before production use
-# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
-# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
-# output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
-# method <- "NBCandEM" # nolint
+input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
+input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
+output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
+method <- "NBCandEM" # nolint
 
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1
@@ -203,10 +203,6 @@ if (method == "NBC") {
     multithread = nslots
   )
 
-log_msg("Running NBC worked")
-
-  tax_mat <- taxa$tax
-
   taxa_df <- taxa |>
     as.data.frame() |>
     rownames_to_column("asv")
@@ -234,8 +230,6 @@ if (method == "NBCandEM") {
   log_msg("Running EM (addSpecies) ...")
   ref_db <- ensure_database(ref_db)
   specs <- addSpecies(taxtab = taxa$tax, refFasta = ref_db)
-
-  tax_mat <- specs
 
   specs_df <- as.data.frame(specs) 
   colnames(specs_df) <- paste("tax", colnames(specs_df), sep = ".")
@@ -271,13 +265,20 @@ log_msg("Computing annotation statistics ...")
 # Return NA when there are too few classified ASVs for the statistic to be
 # defined (mean needs >=1 value, sd needs >=2), so the stats file never carries
 # NaN (mean of an empty vector) or an accidental NA (sd of a single value).
-boot_mean <- function(boot, classified) {
-  vals <- boot[classified]
-  if (length(vals) == 0) NA else mean(vals, na.rm = TRUE)
+boot_mean <- function(boot_column_values) {
+
+if (length(boot_column_values) == 0) {
+  NA
+  } else {
+    mean(boot_column_values, na.rm = TRUE)
+  }
 }
-boot_sd <- function(boot, classified) {
-  vals <- boot[classified]
-  if (length(vals) < 2) NA else sd(vals, na.rm = TRUE)
+boot_sd <- function(boot_column_values) {
+  if (length(boot_column_values) < 2) {
+    NA
+  } else {
+    sd(boot_column_values, na.rm = TRUE)
+  }
 }
 
 ranks <- c("Phylum", "Class", "Order", "Family", "Genus")
@@ -286,22 +287,34 @@ ranks <- c("Phylum", "Class", "Order", "Family", "Genus")
 # vector over rows of asv_table_annot): number of ASVs, mean/sd bootstrap
 # support per rank, and the percent annotated to species. Used once per sample
 # (ASVs present in that sample) and once for the pooled all_samples total.
-annot_stats_row <- function(sample, mask) {
+annot_stats_row <- function(sample_name) {
+
+  if (sample_name == "all_samples") {
+    mask <- rep(TRUE, nrow(asv_table_annot))
+  } else {
+    mask <- asv_table_annot[[sample_name]] > 0
+  }  
+
   row <- data.frame(
-    sample = sample, n_asvs = sum(mask), stringsAsFactors = FALSE
+    sample = sample_name, n_asvs = sum(mask), stringsAsFactors = FALSE
   )
   for (rank in ranks) {
-    boot <- asv_table_annot[[paste0("boot.", rank)]]
-    classified <- mask & !is.na(asv_table_annot[[paste0("tax.", rank)]])
-    row[[paste0("mean_", tolower(rank), "_boot")]] <- as.numeric(boot_mean(boot, classified)) # nolint
-    row[[paste0("sd_",   tolower(rank), "_boot")]] <- as.numeric(boot_sd(boot, classified))   # nolint
+
+    tax_column_name <- paste0("tax.", rank)
+    tax_column_values <- !is.na(asv_table_annot[[tax_column_name]]) & mask
+
+    boot_column_name <- paste0("boot.", rank)
+    boot_column_values <- asv_table_annot[[boot_column_name]][tax_column_values] 
+
+    row[[paste0("mean_", tolower(rank), "_boot")]] <- as.numeric(boot_mean(boot_column_values)) # nolint
+    row[[paste0("sd_",   tolower(rank), "_boot")]] <- as.numeric(boot_sd(boot_column_values))  # nolint
   }
   # Species annotation only comes from NBCandEM (addSpecies); NA under NBC.
   if (!is.null(asv_table_annot$tax.Species) && sum(mask) > 0) {
     row$perc_spec_annot <-
       sum(mask & !is.na(asv_table_annot$tax.Species)) / sum(mask) * 100
   } else {
-    row$perc_spec_annot <- NA_real_
+    row$perc_spec_annot <- NA
   }
   row
 }
@@ -309,8 +322,8 @@ annot_stats_row <- function(sample, mask) {
 # One row per sample (ASVs with count > 0 in that sample), plus a pooled
 # all_samples row over every ASV.
 tax_stats <- do.call(rbind, c(
-  lapply(sample_names, function(s) annot_stats_row(s, asv_table_annot[[s]] > 0)), # nolint
-  list(annot_stats_row("all_samples", rep(TRUE, nrow(asv_table_annot))))
+  lapply(sample_names, function(sample_name) annot_stats_row(sample_name)), # nolint
+  list(annot_stats_row("all_samples"))
 ))
 
 ###############################################################################
@@ -318,7 +331,7 @@ tax_stats <- do.call(rbind, c(
 ###############################################################################
 
 filename_stats <- file.path(stats_dir,
-                            paste0(sub(".R", "", script_name), "-stats.tsv")) # nolint
+                        paste0(sub(".R", "", script_name), "-stats.tsv")) # nolint
 write.table(file = filename_stats, tax_stats,
             sep = "\t", row.names = FALSE, quote = FALSE)
 

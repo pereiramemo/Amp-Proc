@@ -11,8 +11,7 @@
 process MODULE_3_TAXA_ANNOT {
 
     container "ghcr.io/epereira/amp-proc/3-taxa-annot:latest"
-    publishDir { "${params.output_dir}/3-taxa-annot/${label}" },
-           mode: "copy"
+    publishDir { "${params.output_dir}" }, mode: "copy"
 
     tag "${label.toUpperCase()}s"
 
