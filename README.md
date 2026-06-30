@@ -16,7 +16,7 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 .
 ├── LICENSE                                 # License file
 ├── README.md                               # This file
-├── amp-proc.nf                                 # Nextflow workflow entry point
+├── amp-proc.nf                             # Nextflow workflow entry point
 ├── nextflow.config                         # Nextflow parameters and Docker settings
 ├── bin/                                    # Step scripts (auto-staged onto PATH)
 │   ├── 1.1-quality-check.py                # Quality check with fastp
