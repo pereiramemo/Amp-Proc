@@ -6,7 +6,7 @@
 
 process MODULE_2_2_2_VSEARCH_PIPELINE {
 
-    container "ghcr.io/pereiramemo/amp-proc/2.2.2-vsearch-pipeline:latest"
+    container "ghcr.io/pereiramemo/amp-proc/2.2.2-vsearch-pipeline:${params.container_tag}"
     publishDir "${params.output_dir}/",
            mode: "copy"
            

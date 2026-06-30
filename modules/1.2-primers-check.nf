@@ -7,7 +7,7 @@
 
 process MODULE_1_2_PRIMERS_CHECK {
 
-    container "ghcr.io/pereiramemo/amp-proc/1.2-primers-check:latest"
+    container "ghcr.io/pereiramemo/amp-proc/1.2-primers-check:${params.container_tag}"
     publishDir { "${params.output_dir}/${publish_subdir}" },
            mode: "copy",
            enabled: params.full_output.toBoolean()

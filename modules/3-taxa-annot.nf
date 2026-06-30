@@ -10,7 +10,7 @@
 
 process MODULE_3_TAXA_ANNOT {
 
-    container "ghcr.io/pereiramemo/amp-proc/3-taxa-annot:latest"
+    container "ghcr.io/pereiramemo/amp-proc/3-taxa-annot:${params.container_tag}"
     publishDir { "${params.output_dir}" }, mode: "copy"
 
     tag "${label.toUpperCase()}s"
