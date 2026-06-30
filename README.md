@@ -49,32 +49,19 @@ The pipeline runs entirely in containers, so the only prerequisites are:
 - **[Docker](https://docs.docker.com/get-docker/)** (the daemon must be running; the
   invoking user must be able to run `docker`)
 
-Then clone the repository and build the per-module images:
+Then clone the repository:
 
 ```bash
 git clone https://github.com/pereiramemo/Amp-Proc.git
 cd Amp-Proc
-bash docker/dockerbuild_commands.sh
 ```
 
-This builds and tags one image per module (`ghcr.io/pereiramemo/amp-proc/*`) in the local
-Docker store. The images are **not** published to the registry by default, so you must
-run this build step once on every machine where you install amp-proc.
+That is all that is required to run the pipeline. The per-module Docker images are
+published publicly at `ghcr.io/pereiramemo/amp-proc/*`, and Nextflow pulls them
+automatically on the first `nextflow run` (`docker.enabled = true` in `nextflow.config`).
+You only need to build images yourself if you change a Dockerfile or a pinned dependency —
+see [Building & publishing the images](#building--publishing-the-images).
 
-To avoid rebuilding on each machine, push the images to the registry once and let other
-machines pull them automatically on the first `nextflow run`:
-
-```bash
-# Log in once (use a GitHub Personal Access Token with write:packages)
-echo "$GHCR_PAT" | docker login ghcr.io -u <github-user> --password-stdin
-
-# Build, tag with a version, and push (both :latest and :v1.0.0)
-PUSH=1 VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
-```
-
-The build script honours two environment variables: `VERSION` (adds an extra immutable
-tag alongside `:latest`) and `PUSH=1` (pushes after building). For air-gapped hosts,
-`docker save`/`docker load` the images instead.
 For taxonomic annotation, the SILVA reference databases live under `~/.amp-proc/db/`
 (the directory is mounted into the `MODULE_3_TAXA_ANNOT` container — see `nextflow.config`).
 You do not have to download them manually: `3-taxa-annot.R` fetches the DADA2-formatted
@@ -150,6 +137,32 @@ Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container fro
 annotating (a missing but *unrecognized* filename is a fatal error). The download runs inside
 the process container, so it needs network access at runtime — pre-populate `~/.amp-proc/db/`
 to skip it.
+
+## Building & publishing the images
+
+End users do **not** need this section — the published images pull automatically. It is
+only for rebuilding and republishing after changing a Dockerfile or a pinned dependency
+in `docker/resources/*.requirements.yml`. The images are built from the per-module
+Dockerfiles in `docker/` by `docker/dockerbuild_commands.sh` (run from the repository
+root):
+
+```bash
+# Build + tag :latest locally
+bash docker/dockerbuild_commands.sh
+
+# Build, tag with a version, and push (:latest and :v1.0.0) to the registry
+echo "$GHCR_PAT" | docker login ghcr.io -u pereiramemo --password-stdin   # PAT needs write:packages
+PUSH=1 VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
+```
+
+The script honours two environment variables: `VERSION` (adds an extra immutable tag
+alongside `:latest`) and `PUSH=1` (pushes after building). For air-gapped hosts,
+`docker save`/`docker load` the images instead of pulling.
+
+Newly pushed packages are **private by default**; make each one public (GitHub → your
+profile → **Packages** → select the package → **Package settings** → **Change visibility**
+→ **Public**) so machines can pull them anonymously. Otherwise every host must run
+`docker login ghcr.io` before its first `nextflow run`.
 
 ## Dependencies
 
