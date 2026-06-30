@@ -6,7 +6,7 @@
 
 process MODULE_2_1_DADA2_PIPELINE {
 
-    container "ghcr.io/epereira/amp-proc/2.1-dada2-pipeline:latest"
+    container "ghcr.io/pereiramemo/amp-proc/2.1-dada2-pipeline:latest"
     publishDir "${params.output_dir}/",
            mode: "copy",
            enabled: params.full_output.toBoolean()

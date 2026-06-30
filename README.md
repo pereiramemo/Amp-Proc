@@ -57,7 +57,24 @@ cd Amp-Proc
 bash docker/dockerbuild_commands.sh
 ```
 
-This builds and tags one image per module (`ghcr.io/epereira/amp-proc/*`).
+This builds and tags one image per module (`ghcr.io/pereiramemo/amp-proc/*`) in the local
+Docker store. The images are **not** published to the registry by default, so you must
+run this build step once on every machine where you install amp-proc.
+
+To avoid rebuilding on each machine, push the images to the registry once and let other
+machines pull them automatically on the first `nextflow run`:
+
+```bash
+# Log in once (use a GitHub Personal Access Token with write:packages)
+echo "$GHCR_PAT" | docker login ghcr.io -u <github-user> --password-stdin
+
+# Build, tag with a version, and push (both :latest and :v1.0.0)
+PUSH=1 VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
+```
+
+The build script honours two environment variables: `VERSION` (adds an extra immutable
+tag alongside `:latest`) and `PUSH=1` (pushes after building). For air-gapped hosts,
+`docker save`/`docker load` the images instead.
 For taxonomic annotation, the SILVA reference databases live under `~/.amp-proc/db/`
 (the directory is mounted into the `MODULE_3_TAXA_ANNOT` container — see `nextflow.config`).
 You do not have to download them manually: `3-taxa-annot.R` fetches the DADA2-formatted

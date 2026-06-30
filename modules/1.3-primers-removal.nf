@@ -6,7 +6,7 @@
 
 process MODULE_1_3_PRIMERS_REMOVAL {
 
-    container "ghcr.io/epereira/amp-proc/1.3-primers-removal:latest"
+    container "ghcr.io/pereiramemo/amp-proc/1.3-primers-removal:latest"
     publishDir "${params.output_dir}/1.3-primers-removal-out",
            mode: "copy",
            enabled: params.full_output.toBoolean()
