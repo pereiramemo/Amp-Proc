@@ -30,12 +30,10 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 │   └── toolbox.R                           # Shared R helpers
 ├── modules/                                # Nextflow process definitions (*.nf)
 ├── docker/                                 # Per-module Dockerfiles + build script
-│   ├── *.Dockerfile
-│   ├── dockerbuild_commands.sh
-│   └── resources/*.requirements.yml
-└── tests/
-    ├── data/                               # Test FASTQ files (3 samples)
-    └── test_commands.sh                    # Script-level test runner
+    ├── *.Dockerfile
+    ├── dockerbuild_commands.sh
+    └── resources/*.requirements.yml
+
 ```
 
 ## Installation
@@ -133,19 +131,6 @@ Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container fro
 annotating (a missing but *unrecognized* filename is a fatal error). The download runs inside
 the process container, so it needs network access at runtime — pre-populate `~/.amp-proc/db/`
 to skip it.
-
-## Testing
-
-A script-level test is provided in `tests/`. It runs the `bin/` scripts in pipeline
-order on the three-sample dataset in `tests/data/` — useful for checking the scripts
-quickly without building or running containers:
-
-```bash
-bash tests/test_commands.sh
-```
-
-Taxonomic annotation is skipped automatically, as it requires external reference
-databases.
 
 ## Dependencies
 
