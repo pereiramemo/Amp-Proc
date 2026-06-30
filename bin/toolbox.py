@@ -52,7 +52,6 @@ def log_error(msg):
 
 def derive_sample_name(reads1, strip_read_suffix=False, sanitize=False):
     """Derive a sample name from an R1 filename.
-
     strip_read_suffix: drop a trailing _R1/-R1 (and anything after it).
     sanitize:          replace '-' with '_' (vsearch-safe sample labels).
     """
@@ -78,7 +77,6 @@ def _section(title, items):
 def build_log(script_name, script_desc, sample_name, inputs, params,
               outputs, command, exit_status, tool_log=""):
     """Assemble the standardized log file following the project CLAUDE.md.
-
     The general-info block (script name, description, date, sample, inputs,
     parameters, outputs, command, captured Info/Warnings/Errors and exit
     status) must not contain any data statistics; those live in stats/.

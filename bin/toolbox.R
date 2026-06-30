@@ -1,109 +1,151 @@
 ###############################################################################
-### 0. Package dependencies
+### 1. Log-related functions
 ###############################################################################
 
-# Functions below use Biostrings and ShortRead. Calls are namespaced
-# (pkg::fun) so the file is self-contained: sourcing it does not attach the
-# packages globally, and each function loads only what it needs (and errors
-# clearly if the package is missing). blastn_runner() and cutadapt_runner()
-# rely only on base R plus the external binaries.
+# Run-log buffers. NB: the info logger is named log_msg() (not log()) to avoid
+# shadowing base R's log(). log_warn()/log_error() complete the trio required
+# by the project CLAUDE.md. Messages are stored ANSI-free so the log file stays
+# plain text; build_log() renders them in the Info/Warnings/Errors sections.
+.ansi_re   <- "\033\\[[0-9;]*m"
+info_lines  <- character(0)
+warn_lines  <- character(0)
+error_lines <- character(0)
 
-###############################################################################
-### 1. Fun to create all orientations of the input sequence
-###############################################################################
-
-all_orients <- function(PRIMER) {
-
-  DNA <- Biostrings::DNAString(PRIMER)  # Biostrings works w/ DNAString objects rather than character vectors
-
-  orients <- c(Forward = DNA,
-               Complement = Biostrings::complement(DNA),
-               Reverse = Biostrings::reverse(DNA),
-               RevComp = Biostrings::reverseComplement(DNA))
-
-  return(sapply(orients, toString))  # Convert back to character vector
+log_msg <- function(msg) {
+  message(paste0("[INFO] ", msg))
+  info_lines[[length(info_lines) + 1]] <<- gsub(.ansi_re, "", msg)
 }
 
-###############################################################################
-### 2. Fun to count the number of reads in which the primer is found
-###############################################################################
-
-primer_hits <- function(PRIMER, INPUT) {
-
-  nhits <- Biostrings::vcountPattern(pattern = PRIMER,
-                                     subject = ShortRead::sread(ShortRead::readFastq(INPUT)),
-                                     fixed = FALSE)
-  return(sum(nhits > 0))
+log_warn <- function(msg) {
+  message(paste0("[WARN] ", msg))
+  warn_lines[[length(warn_lines) + 1]] <<- gsub(.ansi_re, "", msg)
 }
 
-
-primer_hits_fasta <- function(PRIMER, INPUT) {
-
-  nhits <- Biostrings::vcountPattern(pattern = PRIMER,
-                                     subject = ShortRead::sread(ShortRead::readFasta(INPUT)),
-                                     fixed = FALSE)
-  return(sum(nhits > 0))
+log_error <- function(msg) {
+  message(paste0("[ERROR] ", msg))
+  error_lines[[length(error_lines) + 1]] <<- gsub(.ansi_re, "", msg)
 }
 
-
-###############################################################################
-### 3. Fun to run cutadapt from R
-###############################################################################
-
-cutadapt <- "/home/epereira/.local/bin/cutadapt"
-
-cutadapt_runner <- function(primer_fwd = PRIMER_FWD, 
-                            primer_rev = PRIMER_REV, 
-                            input_r1 = INPUT_R1, 
-                            input_r2 = INPUT_R2, 
-                            output_r1 = OUTPUT_R1, 
-                            output_r2 = OUTPUT_R2,
-                            nslots = NSLOTS) {
-
-  primer_fwd_rc <- dada2::rc(primer_fwd) # rc is used instead of reverseComplement
-  primer_rev_rc <- dada2::rc(primer_rev) # to avoid converting data to DNAstring
-  
-  # Trim FWD and the reverse-complement of REV off of R1 (forward reads)
-  R1_flags <- paste("-g", primer_fwd, "-a", primer_rev_rc) 
-  
-  # Trim REV and the reverse-complement of FWD off of R2 (reverse reads)
-  R2_flags <- paste("-G", primer_rev, "-A", primer_fwd_rc)
-  
-  # Run Cutadapt
-  for(i in seq_along(input_r1)) {
-    
-    system2(cutadapt, 
-            args = c(R1_flags, R2_flags, 
-                     "-n", 2,
-                     "--minimum-length 1",
-                     "--cores", nslots,
-                     "-o", output_r1[i], 
-                     "-p", output_r2[i], 
-                     input_r1[i], 
-                     input_r2[i]))
+# Render a labelled section ("Info:", "Warnings:", ...) with indented items,
+# or "None" when empty.
+.log_section <- function(title, items) {
+  if (length(items) > 0) {
+    c(paste0(title, ":"), paste0("    ", items))
+  } else {
+    c(paste0(title, ":"), "    None")
   }
 }
 
+# Assemble the standardized log file following the project CLAUDE.md. Mirrors
+# the format produced by bin/toolbox.py build_log(). The general-info block must
+# not format produced by bin/toolbox.py build_log(). The general-info block must
+# not contain any data statistics (those live in stats/); third-party tool 
+# output — or, for an R script, the session info — is appended in its own 
+# trailing section.
+build_log <- function(script_name, script_desc, sample_name, inputs, params,
+                      outputs, command, exit_status, tool_log = "") {
+  sep <- strrep("=", 80)
+  lines <- c(
+    sep, "Start of general log info", sep,
+    "",
+    "Script name:",        paste0("    ", script_name),
+    "",
+    "Script description:", paste0("    ", script_desc),
+    "",
+    "Date:",               paste0("    ", format(Sys.time())),
+    "",
+    "Sample name:",        paste0("    ", sample_name),
+    "",
+    "Input data:",         paste0("    ", inputs),
+    "",
+    "Parameters:",         paste0("    ", params),
+    "",
+    "Output data:",        paste0("    ", outputs),
+    "",
+    "- Command executed:", paste0("    ", command),
+    "",
+    .log_section("Info", info_lines),
+    "",
+    .log_section("Warnings", warn_lines),
+    "",
+    .log_section("Errors", error_lines),
+    "",
+    sprintf("Exit status: %s", exit_status),
+    "",
+    sep, "End of general log info.", sep,
+    ""
+  )
+  if (length(tool_log) > 0 && any(nzchar(tool_log))) {
+    lines <- c(lines,
+               sep, "Log info generated by third-party tools.", sep,
+               tool_log)
+  }
+  lines
+}
+
 ###############################################################################
-### 4. Fun to run blastn from R
+### 2. Sequence-related functions
 ###############################################################################
 
-# "2>/dev/null"))
+count_seqs <- function(x) {
+  sum(getUniques(x))
+}
 
-blastn <- "/home/bioinf/bin/blast/blast_v2.10.0+/ncbi-blast-2.10.0+/bin/blastn"
 
-blastn_runner <- function(db = BLAST_DB, input_seqs = INPUT_SEQS, evalue = EVALUE, 
-                          min_identity = MIN_IDENTITY, blout = BLOUT, nslots = NSLOTS) {
-  
-  system2(blastn,
-          args = c("-db", db,
-                   "-query", input_seqs,
-                   "-evalue", evalue,
-                   "-perc_identity", min_identity,
-                   "-outfmt", 6,
-                   "-out", blout,
-                   "-num_alignments", 1,
-                   "-num_threads", nslots))
-                  
+db_dir_default <- file.path(path.expand("~"), ".amp-proc", "db")
+db_registry <- c(
+  "silva_nr99_v138.1_train_set.fa.gz"     = "https://zenodo.org/record/4587955/files/silva_nr99_v138.1_train_set.fa.gz?download=1", # nolint
+  "silva_species_assignment_v138.1.fa.gz" = "https://zenodo.org/record/4587955/files/silva_species_assignment_v138.1.fa.gz?download=1" # nolint
+)
+
+ensure_database <- function(db, db_dir = db_dir_default, 
+                            registry = db_registry) {
+
+  # If the database is a bare filename, resolve it to the default db_dir.                            
+  db_path <- if (basename(db) == db) file.path(db_dir, db) else db
+
+  # check if the database file already exists locally; if so, return it.
+  if (file_test("-f", db_path)) {
+    log_msg(sprintf("Database found: %s", db_path))
+    return(db_path)
+  }
+
+  key <- basename(db_path)
+  if (!key %in% names(registry)) {
+    log_error(sprintf(
+      "Database '%s' not found and no download URL is known. Provide a local file or one of: %s", # nolint
+      key, paste(names(registry), collapse = ", ")
+    ))
+    quit(status = 1)
+  }
+
+  url <- registry[[key]]
+  dir.create(dirname(db_path), recursive = TRUE, showWarnings = FALSE)
+  log_msg(sprintf("Database not found locally; downloading: %s", key))
+  log_msg(sprintf("  URL: %s", url))
+  log_msg(sprintf("  Destination: %s", db_path))
+
+  # Download to a temporary .part file, then rename, so an interrupted download
+  # is never mistaken for a complete database on the next run.
+  tmp <- paste0(db_path, ".part")
+  ok <- tryCatch(
+    {
+      status <- download.file(url, destfile = tmp, mode = "wb", quiet = FALSE)
+      status == 0 && file.exists(tmp) && file.info(tmp)$size > 0
+    },
+    error = function(e) {
+      log_error(sprintf("Download failed for %s: %s", key, conditionMessage(e)))
+      FALSE
+    }
+  )
+  if (!ok) {
+    if (file.exists(tmp)) file.remove(tmp)
+    log_error(sprintf("Failed to download database: %s", key))
+    quit(status = 1)
+  }
+
+  file.rename(tmp, db_path)
+  log_msg(sprintf("Database downloaded: %s", db_path))
+  db_path
 }
 

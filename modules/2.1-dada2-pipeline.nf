@@ -11,12 +11,14 @@ process MODULE_2_1_DADA2_PIPELINE {
            mode: "copy",
            enabled: params.full_output.toBoolean()
 
+    tag "ASVs"
+
     input:
     path all_trimmed
 
     output:
     path "2.1-dada2-pipeline-out",                        emit: dir
-    path "2.1-dada2-pipeline-out/output/asv_table.csv",   emit: asv_table
+    path "2.1-dada2-pipeline-out/output/tables/asv_table.csv",   emit: asv_table
 
     script:
     """

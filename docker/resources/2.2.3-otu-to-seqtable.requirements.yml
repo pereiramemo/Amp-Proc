@@ -1,6 +1,0 @@
-name: amp-proc-2.2.3-otu-to-seqtable
-channels:
-  - bioconda
-  - conda-forge
-dependencies:
-  - python>=3.8

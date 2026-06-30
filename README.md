@@ -62,8 +62,13 @@ bash docker/dockerbuild_commands.sh
 ```
 
 This builds and tags one image per module (`ghcr.io/epereira/amp-proc/*`).
-For taxonomic annotation, place the SILVA reference databases under `~/.amp-proc/db/`
+For taxonomic annotation, the SILVA reference databases live under `~/.amp-proc/db/`
 (the directory is mounted into the `MODULE_3_TAXA_ANNOT` container — see `nextflow.config`).
+You do not have to download them manually: `3-taxa-annot.R` fetches the DADA2-formatted
+SILVA v138.1 files into that directory automatically on first use if they are missing —
+`silva_nr99_v138.1_train_set.fa.gz` (NBC) and `silva_species_assignment_v138.1.fa.gz`
+(NBCandEM). Place them there beforehand to avoid a runtime download (or if the container
+has no network access).
 
 ## Pipeline steps
 
@@ -107,10 +112,10 @@ nextflow run main.nf
 # Choose a single branch
 nextflow run main.nf --method vsearch
 
-# Enable taxonomic annotation (place SILVA databases under ~/.amp-proc/db/)
+# Enable taxonomic annotation (SILVA v138.1 DBs auto-download to ~/.amp-proc/db/ if missing)
 nextflow run main.nf --skip_tax_annot false \
-    --train_db ~/.amp-proc/db/silva_nr_v138_train_seq.fa.gz \
-    --ref_db   ~/.amp-proc/db/silva_species_assignment_v138.fa.gz
+    --train_db ~/.amp-proc/db/silva_nr99_v138.1_train_set.fa.gz \
+    --ref_db   ~/.amp-proc/db/silva_species_assignment_v138.1.fa.gz
 
 # On your own data
 nextflow run main.nf \
@@ -126,7 +131,11 @@ nextflow run main.nf --help
 ```
 
 Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container from `~/.amp-proc`
-(configured via `containerOptions` in `nextflow.config`).
+(configured via `containerOptions` in `nextflow.config`). If a requested database is absent,
+`3-taxa-annot.R` downloads the recognized SILVA v138.1 file into `~/.amp-proc/db/` before
+annotating (a missing but *unrecognized* filename is a fatal error). The download runs inside
+the process container, so it needs network access at runtime — pre-populate `~/.amp-proc/db/`
+to skip it.
 
 ## Testing
 

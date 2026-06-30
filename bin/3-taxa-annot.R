@@ -10,52 +10,51 @@
 suppressMessages(suppressWarnings(library(dada2)))
 suppressMessages(suppressWarnings(library(tidyverse)))
 
-script_dir <- dirname(sys.frame(1)$ofile)
-if (length(script_dir) == 0 || script_dir == "") {
-  script_dir <- getwd()
-}
-source(file.path(script_dir, "toolbox.R"))
+# Load toolbox.R (logging + utility functions) from the script's own directory.
+# this.path::this.dir() resolves the running script's location across Rscript,
+# source(), and RStudio, so toolbox.R is found regardless of the working dir.
+suppressMessages(suppressWarnings(library(this.path)))
+source(file.path(this.dir(), "toolbox.R"))
+
+script_name <- "3-taxa-annot.R"
+script_desc <- "Taxonomic annotation of a sequence-keyed count table (DADA2 NBC / NBC+EM)." # nolint
 
 ###############################################################################
 ### 2. Parse command line arguments
 ###############################################################################
 
 show_usage <- function() {
-  cat("Usage: ./taxa_annot.R <options>\n")
+  cat("Usage: ./3-taxa-annot.R <options>\n")
   cat("--help                          print this help\n")
-  cat("--input_asv_table CHAR          asv table generated with DADA2 (required)\n") # nolint
-  cat("--input_fasta CHAR              fasta file with sequences to annotate (optional)\n") # nolint
-  cat("--output_asv_table CHAR         output asv table with taxonomic annotation (required)\n") # nolint
-  cat("--method CHAR                   annotation method: NBC, NBCandEM, BLAST (default: NBC)\n") # nolint
+  cat("--input_asv_table CHAR          sequence-keyed count table from DADA2/VSEARCH (required)\n") # nolint
+  cat("--table_delim CHAR              delimiter for input table (default: csv)\n") # nolint
+  cat("--output_dir CHAR               directory to output generated data (required)\n") # nolint
+  cat("--method CHAR                   annotation method: NBC, NBCandEM (default: NBC)\n") # nolint
   cat("                                NBC: Naive Bayes Classifier; EM: Exact Matching\n") # nolint
-  cat("--evalue NUM                    evalue used in BLAST search (default: 1e-10)\n") # nolint
-  cat("--min_identity NUM              minimum identity used in BLAST search (default: 97)\n") # nolint
-  cat("--train_db CHAR                 training database to run NBC (default: silva_nr_v138_train_seq.fa.gz)\n") # nolint
-  cat("--ref_db CHAR                   reference database to run EM (default: silva_species_assignment_v138.fa.gz)\n") # nolint
-  cat("--blast_db CHAR                 blast formatted database to run BLAST (default: SILVA_138_SSURef_NR99_tax_silva.fasta)\n") # nolint
-  cat("--taxa_map CHAR                 tsv file mapping silva acc with taxonomy (used with BLAST)\n") # nolint
+  cat("--train_db CHAR                 training database to run NBC (default: silva_nr99_v138.1_train_set.fa.gz)\n") # nolint
+  cat("--ref_db CHAR                   reference database to run EM (default: silva_species_assignment_v138.1.fa.gz)\n") # nolint
   cat("--nslots NUM                    number of threads used (default: 12)\n")
   cat("--save_workspace                save R workspace image (default: TRUE)\n") # nolint
-  cat("--no_save_workspace             disable saving workspace\n") # nolint
-  cat("--overwrite                     overwrite previous output (default: FALSE)\n") # nolint
+  cat("--no_save_workspace             disable saving workspace\n")
+  cat("--overwrite                     overwrite previous directory (default: FALSE)\n") # nolint
   quit(status = 0)
 }
 
 input_asv_table <- NULL
-input_fasta <- NULL
-output_asv_table <- NULL
+table_delim <- "csv"
+output_dir <- NULL
 method <- "NBC"
-evalue <- "1e-10"
-min_identity <- "97"
-train_db <- "silva_nr_v138_train_seq.fa.gz"
-ref_db <- "silva_species_assignment_v138.fa.gz"
-blast_db <- "SILVA_138_SSURef_NR99_tax_silva.fasta"
-taxa_map <- "taxmap_slv_ssu_ref_nr_138.txt"
+train_db <- "silva_nr99_v138.1_train_set.fa.gz"
+ref_db <- "silva_species_assignment_v138.1.fa.gz"
 nslots <- 12
 save_workspace <- TRUE
 overwrite <- FALSE
-blout <- NULL
-seq_map <- NULL
+
+# Dev only — comment out before production use
+# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
+# input_asv_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
+# output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
+# method <- "NBCandEM" # nolint
 
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1
@@ -67,32 +66,20 @@ while (i <= length(args)) {
   } else if (arg == "--input_asv_table") {
     input_asv_table <- args[i + 1]
     i <- i + 1
-  } else if (arg == "--input_fasta") {
-    input_fasta <- args[i + 1]
+  } else if (arg == "--table_delim") {
+    table_delim <- args[i + 1]
     i <- i + 1
-  } else if (arg == "--output_asv_table") {
-    output_asv_table <- args[i + 1]
+  } else if (arg == "--output_dir") {
+    output_dir <- args[i + 1]
     i <- i + 1
   } else if (arg == "--method") {
     method <- args[i + 1]
-    i <- i + 1
-  } else if (arg == "--evalue") {
-    evalue <- args[i + 1]
-    i <- i + 1
-  } else if (arg == "--min_identity") {
-    min_identity <- args[i + 1]
     i <- i + 1
   } else if (arg == "--train_db") {
     train_db <- args[i + 1]
     i <- i + 1
   } else if (arg == "--ref_db") {
     ref_db <- args[i + 1]
-    i <- i + 1
-  } else if (arg == "--blast_db") {
-    blast_db <- args[i + 1]
-    i <- i + 1
-  } else if (arg == "--taxa_map") {
-    taxa_map <- args[i + 1]
     i <- i + 1
   } else if (arg == "--nslots") {
     nslots <- as.numeric(args[i + 1])
@@ -119,8 +106,8 @@ if (is.null(input_asv_table)) {
   show_usage()
 }
 
-if (is.null(output_asv_table)) {
-  cat("Error: --output_asv_table is required\n")
+if (is.null(output_dir)) {
+  cat("Error: --output_dir is required\n")
   show_usage()
 }
 
@@ -129,79 +116,64 @@ if (!file.exists(input_asv_table)) {
   quit(status = 1)
 }
 
-if (file.exists(output_asv_table)) {
-  if (overwrite) {
-    cat(sprintf("Removing existing output file: %s\n", output_asv_table))
-    file.remove(output_asv_table)
-  } else {
-    cat(sprintf(
-      "Error: Output file '%s' already exists. Use --overwrite to overwrite\n",
-      output_asv_table
-    ))
-    quit(status = 1)
-  }
-}
-
-if (!method %in% c("NBC", "NBCandEM", "BLAST")) {
+if (!method %in% c("NBC", "NBCandEM")) {
   cat(sprintf(
-    "Error: Invalid method '%s'. Must be one of: NBC, NBCandEM, BLAST\n",
+    "Error: Invalid method '%s'. Must be one of: NBC, NBCandEM\n",
     method
   ))
   quit(status = 1)
 }
 
-###############################################################################
-### 4. Create fasta and seq map files if needed
-###############################################################################
-
-tmp_fasta <- FALSE
-tmp_blout <- FALSE
-
-if (is.null(input_fasta) || !file.exists(input_fasta)) {
-  cat("Creating FASTA file from ASV table...\n")
-
-  asv_data <- read_csv(
-    file = input_asv_table, col_names = TRUE, show_col_types = FALSE
-  )
-  sequences <- asv_data[[1]]
-
-  input_fasta <- tempfile(pattern = "asvs_", fileext = ".fasta")
-  tmp_fasta <- TRUE
-
-  fasta_content <- character((length(sequences) - 1) * 2)
-  for (idx in 2:length(sequences)) {
-    fasta_content[(idx - 1) * 2 - 1] <- sprintf(">asv_%d", idx - 1)
-    fasta_content[(idx - 1) * 2] <- sequences[idx]
+if (dir.exists(output_dir)) {
+  if (overwrite) {
+    cat(sprintf("Removing existing output directory: %s\n", output_dir))
+    unlink(output_dir, recursive = TRUE)
+  } else {
+    cat(sprintf(
+      "Error: Output directory '%s' already exists. Use --overwrite to overwrite\n", # nolint
+      output_dir
+    ))
+    quit(status = 1)
   }
-  writeLines(fasta_content, input_fasta)
-
-  cat(sprintf("FASTA file created: %s\n", input_fasta))
 }
 
-seq_map <- tempfile(pattern = "seq_map_", fileext = ".tsv")
-cat("Creating sequence map file...\n")
+###############################################################################
+### 4. Create output dirs
+###############################################################################
 
-fasta_lines <- readLines(input_fasta)
-headers <- fasta_lines[seq(1, length(fasta_lines), 2)]
-sequences <- fasta_lines[seq(2, length(fasta_lines), 2)]
-headers <- gsub("^>", "", headers)
+results_dir <- file.path(output_dir, "output")
+logs_dir    <- file.path(output_dir, "logs")
+stats_dir   <- file.path(output_dir, "stats")
 
-seq_map_df <- data.frame(qseqid = headers, asv = sequences)
-write_tsv(seq_map_df, seq_map)
-
-if (is.null(blout)) {
-  blout <- tempfile(pattern = "blast_", fileext = ".out")
-  tmp_blout <- TRUE
-}
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(logs_dir, showWarnings = FALSE)
+dir.create(stats_dir, showWarnings = FALSE)
+dir.create(file.path(results_dir, "tables"), recursive = TRUE, showWarnings = FALSE) # nolint
 
 ###############################################################################
 ### 5. Load and format data
 ###############################################################################
 
-asv_matrix <- read_csv(
-  file = input_asv_table, col_names = TRUE, show_col_types = FALSE
-) |>
-  column_to_rownames("X1") |>
+log_msg("Loading and formatting ASV table ...")
+
+if (table_delim == "csv") {
+  asv_data <- read_csv(
+    file = input_asv_table, col_names = TRUE, show_col_types = FALSE
+  )
+} else if (table_delim == "tsv") {
+  asv_data <- read_tsv(
+    file = input_asv_table, col_names = TRUE, show_col_types = FALSE
+  )
+} else {
+  log_error(sprintf("Unsupported table delimiter: '%s'", table_delim))
+  quit(status = 1)
+}
+# The first column holds the sequences (DADA2-style sequence-keyed table). Its
+# header is blank/auto-named, so normalize it by position before use.
+colnames(asv_data)[1] <- "asv"
+
+asv_matrix <- asv_data |>
+  column_to_rownames("asv") |>
   as.matrix() |>
   t()
 
@@ -210,13 +182,20 @@ asv_tdf <- asv_matrix |>
   as.data.frame() |>
   rownames_to_column("asv")
 
+sample_names <- colnames(asv_tdf)[-1]
+log_msg(sprintf(
+  "Loaded %d sequences across %d samples", nrow(asv_tdf), length(sample_names)
+))
+
 ###############################################################################
 ### 6. Run taxa annot: Naive Bayes Classifier (NBC)
 ###############################################################################
 
 if (method == "NBC") {
 
-  print("Running NBC ...")
+  train_db <- ensure_database(train_db)
+
+  log_msg("Running NBC ...")
   taxa <- assignTaxonomy(
     seqs = asv_matrix,
     refFasta = train_db,
@@ -224,11 +203,15 @@ if (method == "NBC") {
     multithread = nslots
   )
 
-  taxa <- taxa |>
+log_msg("Running NBC worked")
+
+  tax_mat <- taxa$tax
+
+  taxa_df <- taxa |>
     as.data.frame() |>
     rownames_to_column("asv")
 
-  asv_table_annot <- right_join(x = taxa, y = asv_tdf, by = "asv")
+  asv_table_annot <- right_join(x = taxa_df, y = asv_tdf, by = "asv")
 
 }
 
@@ -238,188 +221,153 @@ if (method == "NBC") {
 
 if (method == "NBCandEM") {
 
-  print("Running NBC ...")
+  log_msg("Running NBC ...")
+  train_db <- ensure_database(train_db)
   taxa <- assignTaxonomy(
     seqs = asv_matrix,
     refFasta = train_db,
+    minBoot = 50,
     outputBootstraps = TRUE,
     multithread = nslots
   )
 
-  print("Running EM ...")
-  specs <- addSpecies(taxtab = taxa[[1]], refFasta = ref_db)
+  log_msg("Running EM (addSpecies) ...")
+  ref_db <- ensure_database(ref_db)
+  specs <- addSpecies(taxtab = taxa$tax, refFasta = ref_db)
 
-  colnames(specs) <- paste("tax", colnames(specs), sep = ".")
+  tax_mat <- specs
 
-  taxa <- list(specs, taxa[2]) |>
-    as.data.frame() |>
+  specs_df <- as.data.frame(specs) 
+  colnames(specs_df) <- paste("tax", colnames(specs_df), sep = ".")
+  boot_df <- as.data.frame(taxa$boot) 
+  colnames(boot_df) <- paste("boot", colnames(boot_df), sep = ".")
+
+  if (!all(rownames(specs_df) == rownames(boot_df))) {
+    log_error("Row names of taxonomy and bootstrap data frames do not match")
+    quit(status = 1)
+  }
+  taxa_df <- cbind(specs_df, boot_df) |>
     rownames_to_column("asv")
 
-  asv_table_annot <- right_join(x = taxa, y = asv_tdf, by = "asv")
+  asv_table_annot <- right_join(x = taxa_df, y = asv_tdf, by = "asv")
 
 }
 
 ###############################################################################
-### 8. Run taxa annot: blastn
+### 8. Save asv annot table
 ###############################################################################
 
-if (method == "BLAST") {
+filename_annot <- file.path(results_dir, "tables", "asv_table_annot.csv")
+write.csv(x = asv_table_annot, file = filename_annot, row.names = FALSE)
+log_msg(sprintf("Annotated ASV table saved to: %s", filename_annot))
 
-  print("Running BLAST ...")
-  blastn_runner(
-    db = blast_db,
-    input_seqs = input_fasta,
-    blout = blout,
-    evalue = evalue,
-    min_identity = min_identity,
-    nslots = nslots
+###############################################################################
+### 9. Compute annotation statistics
+###############################################################################
+
+log_msg("Computing annotation statistics ...")
+
+# Mean/SD of bootstrap support over the ASVs classified at a given rank.
+# Return NA when there are too few classified ASVs for the statistic to be
+# defined (mean needs >=1 value, sd needs >=2), so the stats file never carries
+# NaN (mean of an empty vector) or an accidental NA (sd of a single value).
+boot_mean <- function(boot, classified) {
+  vals <- boot[classified]
+  if (length(vals) == 0) NA else mean(vals, na.rm = TRUE)
+}
+boot_sd <- function(boot, classified) {
+  vals <- boot[classified]
+  if (length(vals) < 2) NA else sd(vals, na.rm = TRUE)
+}
+
+ranks <- c("Phylum", "Class", "Order", "Family", "Genus")
+
+# Build one stats row over the subset of ASVs selected by `mask` (a logical
+# vector over rows of asv_table_annot): number of ASVs, mean/sd bootstrap
+# support per rank, and the percent annotated to species. Used once per sample
+# (ASVs present in that sample) and once for the pooled all_samples total.
+annot_stats_row <- function(sample, mask) {
+  row <- data.frame(
+    sample = sample, n_asvs = sum(mask), stringsAsFactors = FALSE
   )
-
-  print("Mapping taxonomy to acc ...")
-
-  blout_df <- read_tsv(blout, col_names = FALSE, show_col_types = FALSE)
-  colnames(blout_df) <- c(
-    "qseqid", "sseqid", "pident", "length",
-    "mismatch", "gapopen", "qstart", "qend",
-    "sstart", "send", "evalue", "bitscore"
-  )
-
-  seq_map_df <- read_tsv(seq_map, col_names = TRUE, show_col_types = FALSE)
-
-  taxa_map_df <- read_tsv(taxa_map, col_names = TRUE, show_col_types = FALSE)
-  taxa_map_df$sseqid <- paste(
-    taxa_map_df$primaryAccession,
-    taxa_map_df$start,
-    taxa_map_df$stop,
-    sep = "."
-  )
-
-  if (!all(blout_df$sseqid %in% taxa_map_df$sseqid)) {
-    stop("Not all sseqid in TAXA_MAP file")
+  for (rank in ranks) {
+    boot <- asv_table_annot[[paste0("boot.", rank)]]
+    classified <- mask & !is.na(asv_table_annot[[paste0("tax.", rank)]])
+    row[[paste0("mean_", tolower(rank), "_boot")]] <- as.numeric(boot_mean(boot, classified)) # nolint
+    row[[paste0("sd_",   tolower(rank), "_boot")]] <- as.numeric(boot_sd(boot, classified))   # nolint
   }
-
-  if (!all(blout_df$qseqid %in% seq_map_df$qseqid)) {
-    stop("Not all qseqid in SEQ_MAP file")
+  # Species annotation only comes from NBCandEM (addSpecies); NA under NBC.
+  if (!is.null(asv_table_annot$tax.Species) && sum(mask) > 0) {
+    row$perc_spec_annot <-
+      sum(mask & !is.na(asv_table_annot$tax.Species)) / sum(mask) * 100
+  } else {
+    row$perc_spec_annot <- NA_real_
   }
-
-  blout_taxa_mapped <- left_join(x = blout_df, y = taxa_map_df, by = "sseqid")
-  seq_taxa_mapped <- left_join(
-    x = seq_map_df, y = blout_taxa_mapped, by = "qseqid"
-  ) |>
-    select(asv, qseqid, sseqid, path, organism_name, pident)
-
-  asv_table_annot <- right_join(x = seq_taxa_mapped, y = asv_tdf, by = "asv")
-
+  row
 }
+
+# One row per sample (ASVs with count > 0 in that sample), plus a pooled
+# all_samples row over every ASV.
+tax_stats <- do.call(rbind, c(
+  lapply(sample_names, function(s) annot_stats_row(s, asv_table_annot[[s]] > 0)), # nolint
+  list(annot_stats_row("all_samples", rep(TRUE, nrow(asv_table_annot))))
+))
 
 ###############################################################################
-### 9. Save asv annot table
+### 10. Export stats
 ###############################################################################
 
-write.csv(x = asv_table_annot, file = output_asv_table)
-print("Output ASV table saved")
+filename_stats <- file.path(stats_dir,
+                            paste0(sub(".R", "", script_name), "-stats.tsv")) # nolint
+write.table(file = filename_stats, tax_stats,
+            sep = "\t", row.names = FALSE, quote = FALSE)
 
-###############################################################################
-### 10. Save session info
-###############################################################################
-
-output_dir <- dirname(output_asv_table)
-filename_session_info <- file.path(output_dir, "session_info_taxa_annot.txt")
-
-sink(filename_session_info)
-on.exit(sink(), add = TRUE)
-
-sep_major <- paste0(strrep("=", 80), "\n")
-sep_minor <- paste0(strrep("-", 80), "\n")
-
-cat(sep_major)
-cat("Taxa Annotation Pipeline - Session Information\n")
-cat(sep_major)
-cat(sprintf("Date: %s\n\n", Sys.time()))
-
-cat(sep_minor)
-cat("INPUT FILES\n")
-cat(sep_minor)
-cat(sprintf("Input ASV table: %s\n", input_asv_table))
-if (!is.null(input_fasta) && !tmp_fasta) {
-  cat(sprintf("Input FASTA file: %s\n", input_fasta))
-} else {
-  cat("Input FASTA file: Generated from ASV table\n")
-}
-cat("\n")
-
-cat(sep_minor)
-cat("PARAMETERS USED\n")
-cat(sep_minor)
-cat(sprintf("Output ASV table: %s\n", output_asv_table))
-cat(sprintf("Annotation method: %s\n", method))
-cat(sprintf("Number of threads (nslots): %d\n", nslots))
-
-if (method %in% c("NBC", "NBCandEM")) {
-  cat(sprintf("Training database: %s\n", train_db))
-}
-
-if (method == "NBCandEM") {
-  cat(sprintf("Reference database: %s\n", ref_db))
-}
-
-if (method == "BLAST") {
-  cat(sprintf("BLAST database: %s\n", blast_db))
-  cat(sprintf("Taxonomy map: %s\n", taxa_map))
-  cat(sprintf("E-value threshold: %s\n", evalue))
-  cat(sprintf("Minimum identity: %s%%\n", min_identity))
-}
-
-cat(sprintf("Workspace saved: %s\n\n", save_workspace))
-
-cat(sep_minor)
-cat("PACKAGE VERSIONS\n")
-cat(sep_minor)
-cat(sprintf("R version: %s\n", R.version.string))
-cat(sprintf("dada2: %s\n", packageVersion("dada2")))
-cat(sprintf("tidyverse: %s\n\n", packageVersion("tidyverse")))
-
-cat(sep_minor)
-cat("FULL SESSION INFO\n")
-cat(sep_minor)
-print(sessionInfo())
-
-cat("\n")
-cat(sep_major)
-cat("END OF SESSION INFO\n")
-cat(sep_major)
-
-sink()
-
-cat(sprintf("Session info saved to: %s\n", filename_session_info))
+log_msg(sprintf("Stats table saved to: %s", filename_stats))
 
 ###############################################################################
 ### 11. Save R workspace
 ###############################################################################
 
 if (save_workspace) {
-  filename_r_data <- file.path(output_dir, ".RData")
+
+  filename_r_data <- file.path(results_dir, ".RData")
   save.image(file = filename_r_data)
-  cat(sprintf("R workspace saved to: %s\n", filename_r_data))
+
 }
 
 ###############################################################################
-### 12. Cleanup temporary files
+### 12. Write standardized log (general info + run log)
 ###############################################################################
 
-if (tmp_fasta && file.exists(input_fasta)) {
-  file.remove(input_fasta)
-  cat("Temporary FASTA file removed\n")
-}
+log_msg("\033[0;32m3-taxa-annot.R completed successfully\033[0m")
 
-if (tmp_blout && file.exists(blout)) {
-  file.remove(blout)
-  cat("Temporary BLAST output file removed\n")
-}
+cmd_executed <- paste(script_name, paste(args, collapse = " "))
+filename_log <- file.path(logs_dir, paste0(sub(".R", "", script_name), ".log"))
 
-if (file.exists(seq_map)) {
-  file.remove(seq_map)
-  cat("Temporary sequence map file removed\n")
-}
+log_text <- build_log(
+  script_name = script_name,
+  script_desc = script_desc,
+  sample_name = paste(sample_names, collapse = ", "),
+  inputs = c(
+    sprintf("Input ASV table: %s", input_asv_table),
+    sprintf("Sequences: %d", nrow(asv_tdf)),
+    sprintf("Samples: %d", length(sample_names))
+  ),
+  params = c(
+    sprintf("Method: %s", method),
+    sprintf("Training database: %s", train_db),
+    if (method == "NBCandEM") sprintf("Reference database: %s", ref_db) else NULL,
+    sprintf("Threads: %d", nslots)
+  ),
+  outputs = c(
+    sprintf("Annotated ASV table: %s", filename_annot),
+    sprintf("Results directory: %s", results_dir),
+    sprintf("Statistics: %s", filename_stats)
+  ),
+  command = cmd_executed,
+  exit_status = 0,
+  # R session info recorded at the end of the log (third-party tools section)
+  tool_log = capture.output(sessionInfo())
+)
 
-cat("Taxa annotation completed successfully!\n")
+writeLines(log_text, filename_log)

@@ -18,8 +18,8 @@ from toolbox import log, log_warn, log_error, build_log
 
 # DEV ONLY — comment out before production use
 """
-samples_dir = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/05_vsearch")
-output_dir  = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/06_otu")
+samples_dir = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.1-vsearch-pipeline-out/")
+output_dir  = Path("/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.2.2-vsearch-pipeline-out/")
 nslots      = 4
 identity    = 0.97
 overwrite   = True
@@ -65,6 +65,14 @@ def compress(src: Path, dst: Path):
 def count_fasta_seqs(fasta_path: Path) -> int:
     return sum(1 for line in open(fasta_path) if line.startswith(">"))
 
+def fix_sample_names(all_fasta: Path, all_fasta_fixed: Path):
+    """Fix sample names in a FASTA file to be vsearch-safe (replace '-' with '_')."""
+    with open(all_fasta, "r") as f_in, open(all_fasta_fixed, "w") as f_out:
+        for line in f_in:
+            if line.startswith(">"):
+                line = line.replace("-", "_")
+            f_out.write(line)
+
 ################################################################################
 # 3. Define the main function
 ################################################################################
@@ -106,7 +114,7 @@ def main():
     results_dir = output_dir / "output"
     logs_dir    = output_dir / "logs"
     stats_dir   = output_dir / "stats"
-    (results_dir / "otus").mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
     stats_dir.mkdir(parents=True, exist_ok=True)
 
@@ -117,6 +125,7 @@ def main():
     log("Collecting chimera-checked FASTA files...")
     fasta_files = sorted(samples_dir.glob("*/output/04-chimera-checked/*-04-chimera-checked.fasta.gz"))
     all_fasta = results_dir / "all_samples.fasta"
+    all_fasta_fixed = results_dir / "all_samples_fixed.fasta"
     all_fasta_gz = results_dir / "all_samples.fasta.gz"
 
     if not fasta_files:
@@ -136,9 +145,15 @@ def main():
             with gzip.open(fasta_gz, "rt") as f_in:
                 shutil.copyfileobj(f_in, out_fh)
 
+    # Count the nunber of sequences in the concatenated FASTA
     n_total = count_fasta_seqs(all_fasta)
 
-    compress(all_fasta, all_fasta_gz)
+    # Fix sample names to be vsearch-safe (replace '-' with '_').
+    fix_sample_names(all_fasta, all_fasta_fixed) 
+    os.remove(all_fasta)  # Replace the original all_fasta with the fixed version.
+
+    # Compress the fixed concatenated FASTA to save space.
+    compress(all_fasta_fixed, all_fasta_gz)
 
     log(f"  Total sequences pooled: {n_total}")
 
@@ -146,11 +161,11 @@ def main():
     # Step 4: OTU clustering
     ###########################################################################
 
-    log(f"Step 1/1: Clustering OTUs at {identity} identity...")
+    log(f"Clustering OTUs at {identity} identity...")
 
-    otus_fasta    = results_dir / "otus" / "otus.fasta"
-    otus_fasta_gz = results_dir / "otus" / "otus.fasta.gz"
-    otu_table     = results_dir / "otus" / "otu_table.tsv"
+    otus_fasta    = results_dir / "otus.fasta"
+    otus_fasta_gz = results_dir / "otus.fasta.gz"
+    otu_table     = results_dir / "otu_table.tsv"
 
     cluster_cmd = [
         "vsearch",
@@ -160,7 +175,7 @@ def main():
         "--otutabout",    otu_table,
         "--sizein",
         "--sizeout",
-        "--relabel",      "OTU_",
+        "--relabel_self",
         "--fasta_width",  0,
         "--threads",      nslots,
     ]

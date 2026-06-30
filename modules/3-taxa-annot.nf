@@ -14,25 +14,21 @@ process MODULE_3_TAXA_ANNOT {
     publishDir { "${params.output_dir}/3-taxa-annot/${label}" },
            mode: "copy"
 
-    tag "${label}"
+    tag "${label.toUpperCase()}s"
 
     input:
-    tuple val(label), path(seq_table)
+    tuple val(table_delim), val(label), path(seq_table)
 
     output:
-    path "${label}_tax_annot.csv"
+    path "3-taxa-annot-${label}-out",                                        emit: dir
 
     script:
     """
-    # toolbox.R is sourced from the script's directory; stage it next to the run
-    cp \$(dirname \$(command -v 3-taxa-annot.R))/toolbox.R .
-
     3-taxa-annot.R \
         --input_asv_table   ${seq_table} \
-        --output_asv_table  ${label}_tax_annot.csv \
+        --table_delim       ${table_delim} \
+        --output_dir        3-taxa-annot-${label}-out \
         --method            ${params.taxa_method} \
-        --evalue            ${params.evalue} \
-        --min_identity      ${params.min_identity} \
         --train_db          ${params.train_db} \
         --ref_db            ${params.ref_db} \
         --nslots            ${params.nslots} \

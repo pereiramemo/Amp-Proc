@@ -9,12 +9,15 @@ process MODULE_2_2_2_VSEARCH_PIPELINE {
     container "ghcr.io/epereira/amp-proc/2.2.2-vsearch-pipeline:latest"
     publishDir "${params.output_dir}/",
            mode: "copy"
+           
+    tag "OTUs"       
 
     input:
     path samples
 
-    output:
-    path "2.2.2-vsearch-pipeline-out"
+    output:               
+    path "2.2.2-vsearch-pipeline-out",                       emit: dir
+    path "2.2.2-vsearch-pipeline-out/output/otu_table.tsv",  emit: otu_table
 
     script:
     """

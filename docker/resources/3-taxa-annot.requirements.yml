@@ -6,4 +6,4 @@ dependencies:
   - r-base>=4.3
   - bioconductor-dada2=1.30.0
   - r-tidyverse=2.0.0
-  - blast=2.16.0
+  - r-this.path
