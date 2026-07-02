@@ -30,7 +30,7 @@ process MODULE_3_TAXA_ANNOT {
         --method            ${params.taxa_method} \
         --train_db          ${params.train_db} \
         --ref_db            ${params.ref_db} \
-        --nslots            ${params.nslots} \
+        --nslots            ${task.cpus} \
         --no_save_workspace \
         --overwrite
     """

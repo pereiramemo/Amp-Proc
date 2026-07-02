@@ -195,6 +195,38 @@ MODULE_3_TAXA_ANNOT — taxonomic annotation (SILVA):
   --ref_db          PATH  EM reference database (default: $HOME/.amp-proc/db/silva_v138.2_assignSpecies.fa.gz)
 ```
 
+## Threads and parallelism
+
+Two parameters control CPU usage:
+
+- `--nslots` — threads given to one tool invocation (a single task).
+- `--maxForks` — how many per-sample tasks run at the same time.
+
+Modules fall into two groups, handled differently:
+
+| Module group | Modules | Threads used | Concurrency |
+|---|---|---|---|
+| Per-sample | quality check, primer check/removal, per-sample VSEARCH | `nslots` each | up to `maxForks` at once |
+| Aggregate (all samples together) | `MODULE_2_1_DADA2_PIPELINE`, `MODULE_2_2_2_VSEARCH_PIPELINE`, `MODULE_3_TAXA_ANNOT` | `nslots * maxForks` | one at a time, alone |
+
+This is enforced by CPU reservations in `nextflow.config`: the local-executor budget is
+`executor.cpus = nslots * maxForks`; per-sample processes reserve `cpus = nslots` (so
+`maxForks` of them fit within the budget), while the aggregate processes reserve the entire
+budget. Because an aggregate task needs every CPU, Nextflow will not start it until the
+other tasks finish and will not run anything beside it — so it uses all threads without
+oversubscription. Those modules pass `${task.cpus}` as their `--nslots`, so the thread
+count always matches the reservation.
+
+> **Keep `nslots * maxForks` at or below the machine's physical core count.** The executor
+> budget is pinned to that product, so a larger value oversubscribes the CPUs (slower,
+> higher risk of running out of memory) — Nextflow will not clamp it for you. Example on a
+> 48-core host: `nextflow run amp-proc.nf --nslots 16 --maxForks 3` (16 × 3 = 48).
+
+With `--method both`, the DADA2 and VSEARCH-OTU stages therefore run sequentially, as do
+the ASV and OTU taxonomy steps. This is deliberate: those steps are thread- and
+memory-heavy, so running them one at a time with all threads is faster and avoids doubling
+peak memory.
+
 ## Building & publishing the images
 
 End users do **not** need this section — the published images pull automatically. It is

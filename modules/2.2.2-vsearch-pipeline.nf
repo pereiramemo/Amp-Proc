@@ -10,7 +10,7 @@ process MODULE_2_2_2_VSEARCH_PIPELINE {
     publishDir "${params.output_dir}/",
            mode: "copy"
            
-    tag "OTUs"       
+    tag "OTUs"   
 
     input:
     path samples
@@ -24,7 +24,7 @@ process MODULE_2_2_2_VSEARCH_PIPELINE {
     2.2.2-vsearch-pipeline.py \
         --samples_dir  . \
         --output_dir   2.2.2-vsearch-pipeline-out \
-        --nslots       ${params.nslots} \
+        --nslots       ${task.cpus} \
         --identity     ${params.identity} \
         --overwrite    t
     """
