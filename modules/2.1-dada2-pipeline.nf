@@ -31,7 +31,7 @@ process MODULE_2_1_DADA2_PIPELINE {
         --trunc_r2        ${params.trunc_r2} \
         --min_overlap     ${params.dada2_min_overlap} \
         --bimeras_method  ${params.bimeras_method} \
-        --nslots          ${task.cpus} \
+        --nslots          ${params.nslots} \
         --no_qual_plot \
         --no_err_plot \
         --no_save_workspace \
