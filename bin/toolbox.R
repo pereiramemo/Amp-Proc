@@ -135,6 +135,14 @@ ensure_database <- function(db, db_dir = db_dir_default,
   log_msg(sprintf("  URL: %s", url))
   log_msg(sprintf("  Destination: %s", db_path))
 
+  # download.file() enforces getOption("timeout") (default 60s) over the whole
+  # transfer, not per byte. The SILVA references are >100 MB, so on a slow link
+  # the 60s limit is reached mid-download and the file is truncated. Raise the
+  # timeout for the duration of this download, then restore the previous value.
+  old_timeout <- getOption("timeout")
+  options(timeout = max(3600, old_timeout))
+  on.exit(options(timeout = old_timeout), add = TRUE)
+
   # Download to a temporary .part file, then rename, so an interrupted download
   # is never mistaken for a complete database on the next run.
   tmp <- paste0(db_path, ".part")
