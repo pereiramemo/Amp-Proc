@@ -20,8 +20,9 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 ├── nextflow.config                         # Nextflow parameters and Docker settings
 ├── bin/                                    # Step scripts (auto-staged onto PATH)
 │   ├── 1.1-quality-check.py                # Quality check with fastp
-│   ├── 1.2-primers-check.py                # IUPAC-aware primer check
-│   ├── 1.3-primers-removal.py              # Primer removal with cutadapt
+│   ├── 1.2-quality-check.R                 # Comparative QC across samples (plots, PhiX)
+│   ├── 1.3-primers-check.py                # IUPAC-aware primer check
+│   ├── 1.4-primers-removal.py              # Primer removal with cutadapt
 │   ├── 2.1-dada2-pipeline.R                # DADA2 ASV pipeline
 │   ├── 2.2.1-vsearch-pipeline.py           # VSEARCH per-sample processing
 │   ├── 2.2.2-vsearch-pipeline.py           # VSEARCH OTU clustering
@@ -77,8 +78,9 @@ to avoid a runtime download (or if the container has no network access).
 | Module | Script | Purpose |
 |--------|--------|---------|
 | `MODULE_1_1_QUALITY_CHECK`     | `1.1-quality-check.py`     | fastp QC report (report-only; diagnostic, always runs) |
-| `MODULE_1_2_PRIMERS_CHECK`     | `1.2-primers-check.py`     | IUPAC-aware primer detection (before & after trimming) |
-| `MODULE_1_3_PRIMERS_REMOVAL`   | `1.3-primers-removal.py`   | cutadapt primer removal |
+| `MODULE_1_2_QUALITY_CHECK`     | `1.2-quality-check.R`      | Comparative cross-sample QC: quality-vs-count plots, count histograms, PhiX (diagnostic, always runs) |
+| `MODULE_1_3_PRIMERS_CHECK`     | `1.3-primers-check.py`     | IUPAC-aware primer detection (before & after trimming) |
+| `MODULE_1_4_PRIMERS_REMOVAL`   | `1.4-primers-removal.py`   | cutadapt primer removal |
 | `MODULE_2_1_DADA2_PIPELINE`    | `2.1-dada2-pipeline.R`     | DADA2 ASV inference (filter → denoise → merge → de-chimera) |
 | `MODULE_2_2_1_VSEARCH_PIPELINE`| `2.2.1-vsearch-pipeline.py`| Per-sample merge → EE filter → derep → chimera check |
 | `MODULE_2_2_2_VSEARCH_PIPELINE`| `2.2.2-vsearch-pipeline.py`| Pool samples → cluster OTUs → OTU table |
@@ -91,15 +93,15 @@ naming conventions are documented in `.claude/CLAUDE.md`.
 
 ## Workflow
 
-After primer removal (`MODULE_1_3_PRIMERS_REMOVAL`), the `--method` parameter selects the
+After primer removal (`MODULE_1_4_PRIMERS_REMOVAL`), the `--method` parameter selects the
 denoising branch:
 
 - `dada2`   → `MODULE_2_1_DADA2_PIPELINE` (ASV table)
 - `vsearch` → `MODULE_2_2_1_VSEARCH_PIPELINE` + `MODULE_2_2_2_VSEARCH_PIPELINE` (OTU table)
 - `both`    → both branches in parallel (default)
 
-`MODULE_1_1_QUALITY_CHECK` (fastp QC) and `MODULE_1_2_PRIMERS_CHECK` (primer check, before and
-after) are diagnostic and always run. Taxonomic annotation (`MODULE_3_TAXA_ANNOT`) runs on
+`MODULE_1_1_QUALITY_CHECK` (fastp QC), `MODULE_1_2_QUALITY_CHECK` (comparative cross-sample QC)
+and `MODULE_1_3_PRIMERS_CHECK` (primer check, before and after) are diagnostic and always run. Taxonomic annotation (`MODULE_3_TAXA_ANNOT`) runs on
 the ASV table and/or the OTU table when `--skip_tax_annot false` is set. Both are
 sequence-keyed count tables (the VSEARCH OTU table is relabelled by sequence via
 `--relabel_self`), so the same `3-taxa-annot.R` script handles either unchanged.
@@ -159,14 +161,14 @@ General:
   --maxForks        INT   Max parallel process instances (default: 3)
   --container_tag   STR   Tag of the ghcr.io/pereiramemo/amp-proc/* images to pull (default: latest)
 
-Primers (MODULE_1_2_PRIMERS_CHECK, MODULE_1_3_PRIMERS_REMOVAL):
+Primers (MODULE_1_3_PRIMERS_CHECK, MODULE_1_4_PRIMERS_REMOVAL):
   --primer_fwd      STR   Forward primer 5'->3' (default: GTGYCAGCMGCCGCGGTAA)
   --primer_rev      STR   Reverse primer 5'->3' (default: CCGYCAATTYMTTTRAGTTT)
 
-MODULE_1_2_PRIMERS_CHECK — primer check:
+MODULE_1_3_PRIMERS_CHECK — primer check:
   --subsample_size  INT   Reads to subsample per file (default: 1000)
 
-MODULE_1_3_PRIMERS_REMOVAL — cutadapt primer removal:
+MODULE_1_4_PRIMERS_REMOVAL — cutadapt primer removal:
   --error_rate        NUM  Max allowed error rate (default: 0.1)
   --min_overlap       INT  Min primer-read overlap (default: 5)
   --min_length        INT  Discard reads shorter than this (default: 50)
