@@ -31,7 +31,7 @@ min_overlap = 5
 min_length = 50
  """
 
-SCRIPT_NAME = "1.3-primers-removal.py"
+SCRIPT_NAME = "1.4-primers-removal.py"
 SCRIPT_DESC = "Remove primers from a single paired-end sample using cutadapt."
 
 ################################################################################
@@ -127,8 +127,8 @@ def main():
     ext       = ".fastq.gz" if compress else ".fastq"
     r1_out    = results_dir / f"{sample_name}_R1_trimmed{ext}"
     r2_out    = results_dir / f"{sample_name}_R2_trimmed{ext}"
-    log_out   = logs_dir    / f"1.3-primers-removal-{sample_name}.log"
-    stats_out = stats_dir   / f"1.3-primers-removal-{sample_name}-stats.tsv"
+    log_out   = logs_dir    / f"1.4-primers-removal-{sample_name}.log"
+    stats_out = stats_dir   / f"1.4-primers-removal-{sample_name}-stats.tsv"
 
     ###########################################################################
     # Step 3: Run cutadapt to remove primers
@@ -199,7 +199,7 @@ def main():
         f"{sample_name}\t{total_pairs}\t{pairs_written}\t{percent_trimmed}\n"
     )
 
-    log("\033[0;32m1.3-primers-removal.py completed successfully\033[0m")
+    log("\033[0;32m1.4-primers-removal.py completed successfully\033[0m")
     
     log_out.write_text(build_log(
         SCRIPT_NAME, SCRIPT_DESC, sample_name,

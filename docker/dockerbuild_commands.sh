@@ -25,8 +25,9 @@ PUSH=1
 # names referenced in modules/<module>.nf.
 MODULES=(
   1.1-quality-check
-  1.2-primers-check
-  1.3-primers-removal
+  1.2-quality-check
+  1.3-primers-check
+  1.4-primers-removal
   2.1-dada2-pipeline
   2.2.1-vsearch-pipeline
   2.2.2-vsearch-pipeline

@@ -1,4 +1,4 @@
-name: amp-proc-1.3-primers-removal
+name: amp-proc-1.4-primers-removal
 channels:
   - bioconda
   - conda-forge

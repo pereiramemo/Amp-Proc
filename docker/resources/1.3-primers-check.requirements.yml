@@ -1,4 +1,4 @@
-name: amp-proc-1.2-primers-check
+name: amp-proc-1.3-primers-check
 channels:
   - bioconda
   - conda-forge

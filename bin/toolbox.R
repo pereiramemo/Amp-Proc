@@ -91,6 +91,30 @@ count_seqs <- function(x) {
   sum(getUniques(x))
 }
 
+# Strip a read-file suffix pattern from a path to recover the sample name.
+extract_sample_name <- function(filepath, pattern) {
+  sub(pattern, "", basename(filepath))
+}
+
+# Count the reads in a FASTQ file, returned as a one-row data frame keyed by
+# sample name (derived from `pattern`). NB: distinct from count_seqs() above,
+# which counts DADA2 unique sequences; this one reads a file from disk.
+count_fastq_seqs <- function(p, pattern) {
+  n <- countFastq(p)$records
+  data.frame(sample = extract_sample_name(p, pattern), nseq = n)
+}
+
+# Estimate PhiX contamination in a FASTQ file. Reservoir-samples n_sample reads
+# in one streaming pass (bounds memory), then matches them against PhiX.
+count_phix_seqs <- function(p, n_sample = 10000, seed = 123) {
+  set.seed(seed)
+  sampler <- FastqSampler(p, n = n_sample)
+  on.exit(close(sampler))
+  seqs <- sread(yield(sampler))
+  nphix <- isPhiX(seqs, wordSize = 16, minMatches = 2)
+  data.frame(file = p, n = length(seqs), nphix = sum(nphix))
+}
+
 
 db_dir_default <- file.path(path.expand("~"), ".amp-proc", "db")
 # Known DADA2-formatted SILVA references, keyed by basename. Two versions are

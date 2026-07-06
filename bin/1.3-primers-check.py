@@ -32,7 +32,7 @@ primer_rev = "CCGYCAATTYMTTTRAGTTT"
 subsample_size = 100
  """
 
-SCRIPT_NAME = "1.2-primers-check.py"
+SCRIPT_NAME = "1.3-primers-check.py"
 SCRIPT_DESC = "Subsample reads and count IUPAC-aware primer hits in all orientations."
 
 ################################################################################
@@ -151,8 +151,8 @@ def main():
     logs_dir.mkdir(parents=True, exist_ok=True)
     stats_dir.mkdir(parents=True, exist_ok=True)
     primer_check_out = results_dir / f"{sample_name}_primer-check.tsv"
-    log_out   = logs_dir  / f"1.2-primers-check-{sample_name}.log"
-    stats_out = stats_dir / f"1.2-primers-check-{sample_name}-stats.tsv"
+    log_out   = logs_dir  / f"1.3-primers-check-{sample_name}.log"
+    stats_out = stats_dir / f"1.3-primers-check-{sample_name}-stats.tsv"
 
     ###########################################################################
     # Step 3: Obtain all orientations of the primers and compile regex patterns
@@ -246,7 +246,7 @@ def main():
         writer.writerow(stats_header)
         writer.writerow(stats_row)
 
-    log("\033[0;32m1.2-primers-check.py completed successfully\033[0m")
+    log("\033[0;32m1.3-primers-check.py completed successfully\033[0m")
 
     unit = "raw counts" if raw_counts else "percentages"
     log_out.write_text(build_log(

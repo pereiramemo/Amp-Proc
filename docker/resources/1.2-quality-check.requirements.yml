@@ -1,0 +1,13 @@
+name: amp-proc-1.2-quality-check
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - r-base>=4.3
+  - bioconductor-dada2=1.30.0
+  - bioconductor-shortread
+  - r-tidyverse=2.0.0
+  - r-doparallel
+  - r-optparse
+  - r-this.path
+  - r-ragg

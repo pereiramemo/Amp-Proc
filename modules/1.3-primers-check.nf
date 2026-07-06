@@ -5,9 +5,9 @@
 // Called twice (before / after primer removal) via aliased imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
-process MODULE_1_2_PRIMERS_CHECK {
+process MODULE_1_3_PRIMERS_CHECK {
 
-    container "ghcr.io/pereiramemo/amp-proc/1.2-primers-check:${params.container_tag}"
+    container "ghcr.io/pereiramemo/amp-proc/1.3-primers-check:${params.container_tag}"
     publishDir { "${params.output_dir}/${publish_subdir}" },
            mode: "copy",
            enabled: params.full_output.toBoolean()
@@ -23,7 +23,7 @@ process MODULE_1_2_PRIMERS_CHECK {
 
     script:
     """
-    1.2-primers-check.py \
+    1.3-primers-check.py \
         --reads1          ${reads[0]} \
         --reads2          ${reads[1]} \
         --sample_name     ${sample_name} \

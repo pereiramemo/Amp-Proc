@@ -2,9 +2,10 @@
 
 // Include modules
 include { MODULE_1_1_QUALITY_CHECK }                                from './modules/1.1-quality-check.nf'
-include { MODULE_1_2_PRIMERS_CHECK as MODULE_1_2_PRIMERS_CHECK_BEFORE }           from './modules/1.2-primers-check.nf'
-include { MODULE_1_2_PRIMERS_CHECK as MODULE_1_2_PRIMERS_CHECK_AFTER }            from './modules/1.2-primers-check.nf'
-include { MODULE_1_3_PRIMERS_REMOVAL }                                from './modules/1.3-primers-removal.nf'
+include { MODULE_1_2_QUALITY_CHECK }                                from './modules/1.2-quality-check.nf'
+include { MODULE_1_3_PRIMERS_CHECK as MODULE_1_3_PRIMERS_CHECK_BEFORE }           from './modules/1.3-primers-check.nf'
+include { MODULE_1_3_PRIMERS_CHECK as MODULE_1_3_PRIMERS_CHECK_AFTER }            from './modules/1.3-primers-check.nf'
+include { MODULE_1_4_PRIMERS_REMOVAL }                                from './modules/1.4-primers-removal.nf'
 include { MODULE_2_1_DADA2_PIPELINE }                                from './modules/2.1-dada2-pipeline.nf'
 include { MODULE_2_2_1_VSEARCH_PIPELINE }                              from './modules/2.2.1-vsearch-pipeline.nf'
 include { MODULE_2_2_2_VSEARCH_PIPELINE }                              from './modules/2.2.2-vsearch-pipeline.nf'
@@ -31,14 +32,14 @@ workflow {
           --maxForks        INT   Max parallel process instances (default: ${params.maxForks})
           --container_tag   STR   Tag of the ghcr.io/pereiramemo/amp-proc/* images to pull (default: ${params.container_tag})
 
-        Primers (MODULE_1_2_PRIMERS_CHECK, MODULE_1_3_PRIMERS_REMOVAL):
+        Primers (MODULE_1_3_PRIMERS_CHECK, MODULE_1_4_PRIMERS_REMOVAL):
           --primer_fwd      STR   Forward primer 5'->3' (default: ${params.primer_fwd})
           --primer_rev      STR   Reverse primer 5'->3' (default: ${params.primer_rev})
 
-        MODULE_1_2_PRIMERS_CHECK — primer check:
+        MODULE_1_3_PRIMERS_CHECK — primer check:
           --subsample_size  INT   Reads to subsample per file (default: ${params.subsample_size})
 
-        MODULE_1_3_PRIMERS_REMOVAL — cutadapt primer removal:
+        MODULE_1_4_PRIMERS_REMOVAL — cutadapt primer removal:
           --error_rate        NUM  Max allowed error rate (default: ${params.error_rate})
           --min_overlap       INT  Min primer-read overlap (default: ${params.min_overlap})
           --min_length        INT  Discard reads shorter than this (default: ${params.min_length})
@@ -84,19 +85,23 @@ workflow {
     // MODULE_1_1_QUALITY_CHECK: fastp quality-check report (diagnostic, always runs)
     MODULE_1_1_QUALITY_CHECK(reads_ch)
 
-    // MODULE_1_2_PRIMERS_CHECK: primer check before trimming (diagnostic, always runs)
-    MODULE_1_2_PRIMERS_CHECK_BEFORE(reads_ch, "1.2-primers-check-before-out")
+    // MODULE_1_2_QUALITY_CHECK: comparative QC across all samples (diagnostic, always runs)
+    raw_reads_all = reads_ch.flatMap { _sample_name, files -> files }.collect()
+    MODULE_1_2_QUALITY_CHECK(raw_reads_all)
 
-    // MODULE_1_3_PRIMERS_REMOVAL: primer removal with cutadapt
-    module_1_3_primers_removal_out = MODULE_1_3_PRIMERS_REMOVAL(reads_ch)
-    trimmed_reads = module_1_3_primers_removal_out.map { sample_name, r1, r2, _stats, _log -> tuple(sample_name, [r1, r2]) }
+    // MODULE_1_3_PRIMERS_CHECK: primer check before trimming (diagnostic, always runs)
+    MODULE_1_3_PRIMERS_CHECK_BEFORE(reads_ch, "1.3-primers-check-before-out")
 
-    // MODULE_1_2_PRIMERS_CHECK: primer check after trimming (diagnostic)
-    MODULE_1_2_PRIMERS_CHECK_AFTER(trimmed_reads, "1.2-primers-check-after-out")
+    // MODULE_1_4_PRIMERS_REMOVAL: primer removal with cutadapt
+    module_1_4_primers_removal_out = MODULE_1_4_PRIMERS_REMOVAL(reads_ch)
+    trimmed_reads = module_1_4_primers_removal_out.map { sample_name, r1, r2, _stats, _log -> tuple(sample_name, [r1, r2]) }
+
+    // MODULE_1_3_PRIMERS_CHECK: primer check after trimming (diagnostic)
+    MODULE_1_3_PRIMERS_CHECK_AFTER(trimmed_reads, "1.3-primers-check-after-out")
 
     // DADA2 (ASV) branch
     if (method in ['dada2', 'both']) {
-        all_trimmed = module_1_3_primers_removal_out.flatMap { _sample_name, r1, r2, _stats, _log -> [r1, r2] }.collect()
+        all_trimmed = module_1_4_primers_removal_out.flatMap { _sample_name, r1, r2, _stats, _log -> [r1, r2] }.collect()
         module_2_1_dada2_pipeline_out = MODULE_2_1_DADA2_PIPELINE(all_trimmed)
      
         // MODULE_3_TAXA_ANNOT: taxonomic annotation of the ASV table
