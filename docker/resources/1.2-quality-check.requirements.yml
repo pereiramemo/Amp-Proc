@@ -3,9 +3,11 @@ channels:
   - bioconda
   - conda-forge
 dependencies:
-  - r-base>=4.3
+  - r-base=4.3
   - bioconductor-dada2=1.30.0
-  - bioconductor-shortread
+  - bioconductor-shortread=1.60.0
+  - bioconductor-genomeinfodb=1.38.1
+  - bioconductor-genomeinfodbdata=1.2.11
   - r-tidyverse=2.0.0
   - r-doparallel
   - r-optparse

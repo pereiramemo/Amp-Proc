@@ -109,19 +109,19 @@ sequence-keyed count tables (the VSEARCH OTU table is relabelled by sequence via
 ## Run
 
 ```bash
-# Quick test with the bundled data (denoising only; taxonomy needs reference DBs)
-./amp-proc.nf
+# Quick test with the bundled data (default: both denoising branches + taxonomy)
+nextflow run amp-proc.nf
 
 # Choose a single branch
-./amp-proc.nf --method vsearch
+nextflow run amp-proc.nf --method vsearch
 
 # Enable taxonomic annotation (SILVA v138.2 DBs auto-download to ~/.amp-proc/db/ if missing)
-./amp-proc.nf --skip_tax_annot false \
+nextflow run amp-proc.nf --skip_tax_annot false \
     --train_db ~/.amp-proc/db/silva_nr99_v138.2_toGenus_trainset.fa.gz \
     --ref_db   ~/.amp-proc/db/silva_v138.2_assignSpecies.fa.gz
 
 # On your own data
-./amp-proc.nf \
+nextflow run amp-proc.nf \
     --input_dir     /path/to/fastq \
     --reads_pattern '*_R{1,2}_001.fastq.gz' \
     --output_dir    /path/to/results \
@@ -130,7 +130,7 @@ sequence-keyed count tables (the VSEARCH OTU table is relabelled by sequence via
     --nslots        16
 
 # Full parameter listing
-./amp-proc.nf --help
+nextflow run amp-proc.nf --help
 ```
 
 Reference databases for `MODULE_3_TAXA_ANNOT` are mounted into the container from `~/.amp-proc`
@@ -238,17 +238,19 @@ Dockerfiles in `docker/` by `docker/dockerbuild_commands.sh` (run from the repos
 root):
 
 ```bash
-# Build + tag :latest locally
+# Build/tag/push the current module images
+echo "$GHCR_PAT" | docker login ghcr.io -u pereiramemo --password-stdin   # PAT needs write:packages
 bash docker/dockerbuild_commands.sh
 
-# Build, tag with a version, and push (:latest and :v1.0.0) to the registry
-echo "$GHCR_PAT" | docker login ghcr.io -u pereiramemo --password-stdin   # PAT needs write:packages
-PUSH=1 VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
+# Build/tag/push plus an additional immutable version tag (:v1.0.0)
+VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
 ```
 
-The script honours two environment variables: `VERSION` (adds an extra immutable tag
-alongside `:latest`) and `PUSH=1` (pushes after building). For air-gapped hosts,
-`docker save`/`docker load` the images instead of pulling.
+The script currently honours `VERSION` (adds an extra immutable tag alongside
+`:latest`). At the moment it is configured to always push after building
+(`PUSH=1` inside `docker/dockerbuild_commands.sh`). If you need build-only behavior,
+set `PUSH` back to environment-driven logic in that script first. For air-gapped
+hosts, `docker save`/`docker load` the images instead of pulling.
 
 Newly pushed packages are **private by default**; make each one public (GitHub → your
 profile → **Packages** → select the package → **Package settings** → **Change visibility**
@@ -262,14 +264,14 @@ Every module pulls `ghcr.io/pereiramemo/amp-proc/<module>:${params.container_tag
 the most recent build) in `nextflow.config`, and like any parameter it can be overridden on
 the command line with `--container_tag`. For a reproducible install — where a given checkout
 always resolves to the same immutable image set — pin a published version, either per run
-(`./amp-proc.nf --container_tag v1.0.0`) or by changing the default in
+(`nextflow run amp-proc.nf --container_tag v1.0.0`) or by changing the default in
 `nextflow.config`.
 
 To cut a versioned release:
 
 1. Build and push the versioned tag (this also updates `:latest`):
    ```bash
-   PUSH=1 VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
+  VERSION=v1.0.0 bash docker/dockerbuild_commands.sh
    ```
 2. Pin `container_tag` to that version (in `nextflow.config` or via `--container_tag`).
 

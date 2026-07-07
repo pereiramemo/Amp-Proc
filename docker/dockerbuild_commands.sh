@@ -21,6 +21,7 @@ REGISTRY="ghcr.io/pereiramemo/amp-proc"
 VERSION="${VERSION:-}"   # optional extra tag (e.g. v1.0.0); empty = only :latest
 # PUSH="${PUSH:-0}"        # set to 1 to push images after building
 PUSH=1
+VERSION="latest"
 # Module base names — must match docker/<module>.Dockerfile and the image
 # names referenced in modules/<module>.nf.
 MODULES=(
