@@ -140,6 +140,140 @@ annotating (a missing but *unrecognized* filename is a fatal error). The downloa
 the process container, so it needs network access at runtime — pre-populate `~/.amp-proc/db/`
 to skip it.
 
+## Outputs
+
+Every module publishes into `--output_dir` under a directory named after the module
+(`<module>-out/`), and each of those directories follows the same three-way layout:
+
+- `output/` — the module's actual results
+- `logs/` — a log file with a general-info header (date, sample, inputs, parameters,
+  outputs, command, exit status) followed by the raw output of any third-party tool the
+  module ran
+- `stats/` — a tab-delimited table, samples as rows and statistics as columns
+
+Per-sample modules insert a `<sample_name>/` level between the module directory and that
+layout; modules that process all samples at once do not.
+
+```
+<output_dir>/
+├── 1.1-quality-check-out/<sample>/{output,logs,stats}/
+├── 1.2-quality-check-out/{output,logs,stats}/
+├── 1.3-primers-check-before-out/<sample>/{output,logs,stats}/
+├── 1.3-primers-check-after-out/<sample>/{output,logs,stats}/
+├── 1.4-primers-removal-out/<sample>/{output,logs,stats}/
+├── 2.1-dada2-pipeline-out/{output,logs,stats}/                # --method dada2 | both
+├── 2.2.1-vsearch-pipeline-out/<sample>/{output,logs,stats}/   # --method vsearch | both
+├── 2.2.2-vsearch-pipeline-out/{output,logs,stats}/            # --method vsearch | both
+├── 3-taxa-annot-asv-out/{output,logs,stats}/                  # DADA2 branch, unless --skip_tax_annot true
+└── 3-taxa-annot-otu-out/{output,logs,stats}/                  # VSEARCH branch, unless --skip_tax_annot true
+```
+
+> **Note on `--full_output false`.** It suppresses publication of modules 1.1, 1.2, 1.3,
+> 1.4, 2.2.1 **and 2.1** — so `2.1-dada2-pipeline-out/` and with it `asv_table.csv` are
+> not written either. Modules 2.2.2 and 3 always publish. Keep the default (`true`) unless
+> you only want the OTU table and the annotated tables.
+
+### Main results per module
+
+| Module directory | Key files under `output/` | Contents |
+|---|---|---|
+| `1.1-quality-check-out/<sample>/` | `<sample>_fastp.html`, `<sample>_fastp.json` | fastp per-sample QC report — per-cycle quality, base composition, adapter content, duplication — in browser-readable and machine-readable form |
+| `1.2-quality-check-out/` | `r1_mean_q_vs_nseq.png`, `r2_mean_q_vs_nseq.png`, `samples_hist.png`, `samples_hist_log.png`, `samples_perc_phix_barplot.png` | Cross-sample comparison: mean quality vs read count per sample (R1 and R2), read-count histograms (linear and log), and % PhiX per sample (bars above 0.005 % highlighted) |
+| `1.3-primers-check-before-out/<sample>/`<br>`1.3-primers-check-after-out/<sample>/` | `<sample>_primer-check.tsv` | 4 × 4 matrix: rows are read/primer combinations (`FwdReads.FwdPrimer`, `RevReads.FwdPrimer`, `FwdReads.RevPrimer`, `RevReads.RevPrimer`), columns are orientations (`Forward`, `Complement`, `Reverse`, `RevComp`), values are the % of subsampled reads carrying that primer in that orientation (IUPAC-aware). Run before and after trimming — the "after" table should be ~0 everywhere |
+| `1.4-primers-removal-out/<sample>/` | `<sample>_R1_trimmed.fastq.gz`, `<sample>_R2_trimmed.fastq.gz` | Primer-trimmed reads. These are the input to both denoising branches |
+| `2.1-dada2-pipeline-out/` | `tables/asv_table.csv`, `filtered/<sample>_R{1,2}_filt.fastq.gz` | **ASV table** — rows are ASV sequences, columns are samples, values are read counts (the first header field is empty, since sequences are row names) — plus the quality-filtered reads DADA2 worked from |
+| `2.2.1-vsearch-pipeline-out/<sample>/` | `01-merged/`, `02-filtered/`, `03-derep/`, `04-chimera-checked/` | Per-sample VSEARCH intermediates in pipeline order: merged pairs (FASTQ) → expected-error-filtered FASTA → dereplicated FASTA plus its `.uc` cluster map → chimera-checked FASTA plus the sequences flagged as chimeric |
+| `2.2.2-vsearch-pipeline-out/` | `otu_table.tsv`, `otus.fasta.gz`, `all_samples.fasta.gz` | **OTU table** — the first column `#OTU ID` holds the centroid sequence (`--relabel_self`), the remaining columns are samples — plus the OTU centroid sequences and the pooled per-sample FASTA that was clustered |
+| `3-taxa-annot-asv-out/`<br>`3-taxa-annot-otu-out/` | `tables/asv_table_annot.csv` | **The final annotated count table** — taxonomy, bootstrap support and per-sample counts in one file. Detailed below |
+
+The `stats/` table of each module carries these columns (sample names in the first column):
+
+| Stats file | Columns |
+|---|---|
+| `1.1-quality-check-<sample>-stats.tsv` | `total_reads`, `total_bases`, `q20_bases`, `q20_rate`, `q30_bases`, `q30_rate`, `read1_mean_length`, `read2_mean_length`, `gc_content` |
+| `1.2-quality-check-stats.tsv` | `nseq`, `mean_q_r1`, `mean_q_r2`, `phix_pct` |
+| `1.3-primers-check-<sample>-stats.tsv` | the four expected orientations, in %: `FwdReads.FwdPrimer.Forward`, `FwdReads.RevPrimer.RevComp`, `RevReads.RevPrimer.Forward`, `RevReads.FwdPrimer.RevComp` |
+| `1.4-primers-removal-<sample>-stats.tsv` | `total_pairs`, `trimmed_pairs`, `percent_trimmed` |
+| `2.1-dada2-pipeline-stats.tsv` | DADA2 read tracking: `raw`, `filtered`, `denoisedR1`, `denoisedR2`, `merged`, `nobim`, plus merged-length summaries `mean_length`, `sd_length`, `max_length`, `min_length` |
+| `2.2.1-vsearch-pipeline-<sample>-stats.tsv` | `pairs_in`, `pairs_merged`, `percent_merged`, `reads_passed`, `percent_passed`, `seqs_unique`, `percent_unique`, `chimeras`, `nonchimeras`, `pct_chimeric_seqs`, `abund_in`, `abund_nonchimeric`, `pct_abund_retained` |
+| `2.2.2-vsearch-pipeline-stats.tsv` | one `all_samples` row: `pooled_seqs`, `otus` |
+| `3-taxa-annot-stats.tsv` | `n_asvs`, then `mean_<rank>_boot` / `sd_<rank>_boot` for phylum, class, order, family and genus, then `perc_spec_annot`. One row per sample (sequences with count > 0 in it) plus a pooled `all_samples` row |
+
+### The final table: `asv_table_annot.csv`
+
+This is the end product of the pipeline — taxonomy, classifier confidence and abundances
+in a single file:
+
+- `3-taxa-annot-asv-out/output/tables/asv_table_annot.csv` — DADA2 ASVs
+- `3-taxa-annot-otu-out/output/tables/asv_table_annot.csv` — VSEARCH OTUs
+
+> Both branches produce a file named `asv_table_annot.csv`: the OTU table is annotated by
+> the same `3-taxa-annot.R` script, which keeps the ASV naming throughout. In the
+> `3-taxa-annot-otu-out/` copy the rows are OTU centroid sequences, and the key column is
+> still called `asv`.
+
+**File format.** Comma-separated with a single header line, written by R's `write.csv()`:
+character fields are quoted with `"`, numeric fields are unquoted, missing values are
+written as bare `NA`, line endings are `\n`, and there is no row-name column. One row per
+ASV/OTU.
+
+**Columns, in order:**
+
+| Position | Column | Type | Description |
+|---|---|---|---|
+| 1 | `asv` | string (DNA) | The full sequence. This is the row key — not an accession or an `ASV_1`-style ID — and it is the same string that keys `asv_table.csv` / `otu_table.tsv`, which is what lets one script annotate either table |
+| 2–7 | `tax.Kingdom`, `tax.Phylum`, `tax.Class`, `tax.Order`, `tax.Family`, `tax.Genus` | string or `NA` | SILVA taxonomy from DADA2's naive Bayes classifier (`assignTaxonomy` against `--train_db`, bootstrap threshold `minBoot = 50`). A rank is `NA` for either of two reasons: bootstrap support below 50 %, **or** the SILVA lineage simply not naming that rank. Once a rank is `NA`, every rank below it is `NA` too |
+| 8 | `tax.Species` | string or `NA` | **Only with `--taxa_method NBCandEM`.** Species from exact matching (`addSpecies` against `--ref_db`); `NA` when the sequence has no exact match in the reference. The column is absent under the default `NBC` |
+| next 6 | `boot.Kingdom`, `boot.Phylum`, `boot.Class`, `boot.Order`, `boot.Family`, `boot.Genus` | integer, 0–100 | Bootstrap support for that rank, as a percentage of 100 replicates. Always read it next to the matching `tax.` column: a high `boot.` on an `NA` rank means the classifier was confident but the reference has no name there — do not treat the bootstrap value alone as evidence of an assignment. There is deliberately no `boot.Species`: exact matching is not bootstrapped |
+| last *N* | one column per sample | integer | Read count of that sequence in that sample |
+
+So the table is `1 + 6 + 6 + N` = **13 + N** columns wide with the default `--taxa_method NBC`,
+and **14 + N** with `NBCandEM`, where *N* is the number of samples.
+
+Sample column names come straight from the count table being annotated, i.e. the
+`fromFilePairs` prefix of the input FASTQ files. Note that the VSEARCH branch replaces
+`-` with `_` (VSEARCH requires sample names without hyphens), so a sample that appears as
+`1-samo1_S1_L001` in the ASV table appears as `1_samo1_S1_L001` in the OTU table.
+
+**Example** (default `NBC`, three samples; sequences truncated for display):
+
+```csv
+"asv","tax.Kingdom","tax.Phylum","tax.Class","tax.Order","tax.Family","tax.Genus","boot.Kingdom","boot.Phylum","boot.Class","boot.Order","boot.Family","boot.Genus","1-samo1_S1_L001","2-samo2_S2_L001","3-samo3_S3_L001"
+"TACGAAGGGACCTAGCGTAGTTCGG…CGCAAGGTTA","Bacteria","Pseudomonadota","Alphaproteobacteria","Pelagibacterales","Clade I","Clade Ia",100,100,100,100,100,100,918,59,1239
+"TACGGAGGGGGTTAGCGTTGTTCGG…CGCAAGATTA","Bacteria","Pseudomonadota","Alphaproteobacteria","Rhodobacterales","Paracoccaceae","Amylibacter",100,100,100,100,100,100,5,1452,357
+"TACCGGCAGCTCAAGTGGTCGTCGC…CGCAAGGCTG","Archaea","Thermoplasmatota","Thermoplasmata","Marine Group II",NA,NA,100,100,100,100,100,100,11,936,5
+```
+
+The third row shows the common `NA` case: SILVA has no family or genus name under
+*Marine Group II*, so `tax.Family` and `tax.Genus` are `NA` even though the bootstrap
+columns read 100. In the bundled three-sample test run, 325 of the 357 `NA` ranks are of
+this kind and only 32 come from support below the 50 % threshold.
+
+**Loading it.** Split the three column blocks by prefix, so the code does not depend on the
+number of ranks or samples:
+
+```r
+annot  <- read.csv("3-taxa-annot-asv-out/output/tables/asv_table_annot.csv",
+                   check.names = FALSE)          # keep sample names verbatim
+tax    <- annot[, grep("^tax\\.",  names(annot)), drop = FALSE]
+boot   <- annot[, grep("^boot\\.", names(annot)), drop = FALSE]
+counts <- annot[, setdiff(names(annot), c("asv", names(tax), names(boot)))]
+rownames(tax) <- rownames(counts) <- annot$asv    # ready for phyloseq
+```
+
+```python
+import pandas as pd
+
+annot  = pd.read_csv("3-taxa-annot-asv-out/output/tables/asv_table_annot.csv",
+                     index_col="asv")
+tax    = annot.filter(regex=r"^tax\.")
+boot   = annot.filter(regex=r"^boot\.")
+counts = annot.drop(columns=tax.columns.union(boot.columns))
+```
+
+`check.names = FALSE` matters in R: sample names often start with a digit, and the default
+would silently rename `1-samo1_S1_L001` to `X1.samo1_S1_L001`.
+
 ## Parameters
 
 All parameters have defaults in `nextflow.config` and can be overridden on the command
