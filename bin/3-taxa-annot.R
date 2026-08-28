@@ -108,12 +108,12 @@ while (i <= length(args)) {
 ###############################################################################
 
 if (is.null(input_table)) {
-  cat("--input_table is required (see --help)\n")
+  cat("Error: --input_table is required (see --help)\n")
   quit(status = 1)
 }
 
 if (is.null(output_dir)) {
-  cat("--output_dir is required (see --help)\n")
+  cat("Error: --output_dir is required (see --help)\n")
   quit(status = 1)
 }
 
@@ -168,7 +168,7 @@ dir.create(file.path(results_dir, "tables"), recursive = TRUE, showWarnings = FA
 ### 5. Load and format data
 ###############################################################################
 
-log_msg("Loading and formatting ASV table ...")
+log_msg(sprintf("Loading and formatting %s table ...", toupper(taxa_unit)))
 
 if (table_delim == "csv") {
   input_table_df <- read_csv(
@@ -266,13 +266,15 @@ if (method == "NBCandEM") {
 }
 
 ###############################################################################
-### 8. Save asv annot table
+### 8. Save annotated table
 ###############################################################################
 
 file_annot_name <- paste(taxa_unit, "table_annot.csv", sep = "_")
 file_annot_path <- file.path(results_dir, "tables", file_annot_name)
 write.csv(x = annot_table, file = file_annot_path, row.names = FALSE)
-log_msg(sprintf("Annotated ASV table saved to: %s", file_annot_path))
+log_msg(sprintf(
+  "Annotated %s table saved to: %s", toupper(taxa_unit), file_annot_path
+))
 
 ###############################################################################
 ### 9. Compute annotation statistics
@@ -280,8 +282,8 @@ log_msg(sprintf("Annotated ASV table saved to: %s", file_annot_path))
 
 log_msg("Computing annotation statistics ...")
 
-# Mean/SD of bootstrap support over the ASVs classified at a given rank.
-# Return NA when there are too few classified ASVs for the statistic to be
+# Mean/SD of bootstrap support over the sequences classified at a given rank.
+# Return NA when there are too few classified sequences for the statistic to be
 # defined (mean needs >=1 value, sd needs >=2), so the stats file never carries
 # NaN (mean of an empty vector) or an accidental NA (sd of a single value).
 boot_mean <- function(boot_column_values) {
@@ -302,10 +304,11 @@ boot_sd <- function(boot_column_values) {
 
 ranks <- c("Phylum", "Class", "Order", "Family", "Genus")
 
-# Build one stats row over the subset of ASVs selected by `mask` (a logical
-# vector over rows of asv_table_annot): number of ASVs, mean/sd bootstrap
-# support per rank, and the percent annotated to species. Used once per sample
-# (ASVs present in that sample) and once for the pooled all_samples total.
+# Build one stats row over the subset of sequences selected by `mask` (a
+# logical vector over rows of annot_table): number of ASVs/OTUs, mean/sd
+# bootstrap support per rank, and the percent annotated to species. Used once
+# per sample (sequences present in that sample) and once for the pooled
+# all_samples total.
 annot_stats_row <- function(sample_name) {
 
   if (sample_name == "all_samples") {
@@ -338,8 +341,8 @@ annot_stats_row <- function(sample_name) {
   row
 }
 
-# One row per sample (ASVs with count > 0 in that sample), plus a pooled
-# all_samples row over every ASV.
+# One row per sample (sequences with count > 0 in that sample), plus a pooled
+# all_samples row over every sequence.
 tax_stats <- do.call(rbind, c(
   lapply(sample_names, function(sample_name) annot_stats_row(sample_name)), # nolint
   list(annot_stats_row("all_samples"))
@@ -374,14 +377,14 @@ if (save_workspace) {
 log_msg("\033[0;32m3-taxa-annot.R completed successfully\033[0m")
 
 cmd_executed <- paste(script_name, paste(args, collapse = " "))
-filename_log <- file.path(logs_dir, paste0(sub("\\.R$", "", script_name), ".log"))
+filename_log <- file.path(logs_dir, paste0(sub("\\.R$", "", script_name), ".log")) # nolint
 
 log_text <- build_log(
   script_name = script_name,
   script_desc = script_desc,
   sample_name = paste(sample_names, collapse = ", "),
   inputs = c(
-    sprintf("Input ASV table: %s", input_table),
+    sprintf("Input %s table: %s", toupper(taxa_unit), input_table),
     sprintf("Sequences: %d", nrow(input_table_tdf)),
     sprintf("Samples: %d", length(sample_names))
   ),
@@ -392,7 +395,7 @@ log_text <- build_log(
     sprintf("Threads: %d", nslots)
   ),
   outputs = c(
-    sprintf("Annotated ASV table: %s", file_annot_path),
+    sprintf("Annotated %s table: %s", toupper(taxa_unit), file_annot_path),
     sprintf("Results directory: %s", results_dir),
     sprintf("Statistics: %s", filename_stats)
   ),
