@@ -47,14 +47,14 @@ table_delim <- "csv"
 taxa_unit <- "asv"
 output_dir <- NULL
 method <- "NBC"
-train_db <- "silva_nr99_v138.2_toGenus_trainset.fa.gz"
-ref_db <- "silva_v138.2_assignSpecies.fa.gz"
+train_db <- "silva_nr99_v138.2_toGenus_trainset.fa.gz" # nolint
+ref_db <- "silva_v138.2_assignSpecies.fa.gz" # nolint
 nslots <- 12
 save_workspace <- TRUE
 overwrite <- FALSE
 
 # Dev only — comment out before production use
-# input_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.1-dada2-piepeline-out/output/tables/asv_table.csv" # nolint
+# input_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output_nf/2.1-dada2-pipeline-out/output/tables/asv_table.csv" # nolint
 # input_table <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/2.2.2-vsearch-pipeline-out/output/otu_table.tsv" # nolint
 # output_dir <- "/home/epereira/workspace/repos/tools/Amp-Proc/tests/output/3-taxa_annot_output/" # nolint
 # method <- "NBCandEM" # nolint
@@ -108,17 +108,17 @@ while (i <= length(args)) {
 ###############################################################################
 
 if (is.null(input_table)) {
-  log_error("--input_table is required (see --help)")
+  cat("--input_table is required (see --help)\n")
   quit(status = 1)
 }
 
 if (is.null(output_dir)) {
-  log_error("--output_dir is required (see --help)")
+  cat("--output_dir is required (see --help)\n")
   quit(status = 1)
 }
 
 if (!file.exists(input_table)) {
-  cat(sprintf("Error: Input ASV table '%s' does not exist\n", input_table))
+  cat(sprintf("Error: Input table '%s' does not exist\n", input_table))
   quit(status = 1)
 }
 
@@ -126,6 +126,14 @@ if (!method %in% c("NBC", "NBCandEM")) {
   cat(sprintf(
     "Error: Invalid method '%s'. Must be one of: NBC, NBCandEM\n",
     method
+  ))
+  quit(status = 1)
+}
+
+if (!taxa_unit %in% c("asv", "otu")) {
+  cat(sprintf(
+    "Error: Invalid taxa unit '%s'. Must be one of: asv, otu\n",
+    taxa_unit
   ))
   quit(status = 1)
 }
@@ -187,14 +195,14 @@ input_table_mtx <- input_table_df |>
   as.matrix() |>
   t()
 
-taxa_unit_tdf <- input_table_mtx |>
+input_table_tdf <- input_table_mtx |>
   t() |>
   as.data.frame() |>
   rownames_to_column(taxa_unit)
 
-sample_names <- colnames(taxa_unit_tdf)[-1]
+sample_names <- colnames(input_table_tdf)[-1]
 log_msg(sprintf(
-  "Loaded %d sequences across %d samples", nrow(taxa_unit_tdf), length(sample_names)
+  "Loaded %d sequences across %d samples", nrow(input_table_tdf), length(sample_names) # nolint
 ))
 
 ###############################################################################
@@ -217,7 +225,7 @@ if (method == "NBC") {
     as.data.frame() |>
     rownames_to_column(taxa_unit)
 
-  annot_table <- right_join(x = taxa_df, y = taxa_unit_tdf, by = taxa_unit)
+  annot_table <- right_join(x = taxa_df, y = input_table_tdf, by = taxa_unit)
 
 }
 
@@ -253,7 +261,7 @@ if (method == "NBCandEM") {
   taxa_df <- cbind(specs_df, boot_df) |>
     rownames_to_column(taxa_unit)
 
-  annot_table <- right_join(x = taxa_df, y = taxa_unit_tdf, by = taxa_unit)
+  annot_table <- right_join(x = taxa_df, y = input_table_tdf, by = taxa_unit)
 
 }
 
@@ -342,7 +350,7 @@ tax_stats <- do.call(rbind, c(
 ###############################################################################
 
 filename_stats <- file.path(stats_dir,
-                        paste0(sub(".R", "", script_name), "-stats.tsv")) # nolint
+                        paste0(sub("\\.R$", "", script_name), "-stats.tsv")) # nolint
 write.table(file = filename_stats, tax_stats,
             sep = "\t", row.names = FALSE, quote = FALSE)
 
@@ -366,7 +374,7 @@ if (save_workspace) {
 log_msg("\033[0;32m3-taxa-annot.R completed successfully\033[0m")
 
 cmd_executed <- paste(script_name, paste(args, collapse = " "))
-filename_log <- file.path(logs_dir, paste0(sub(".R", "", script_name), ".log"))
+filename_log <- file.path(logs_dir, paste0(sub("\\.R$", "", script_name), ".log"))
 
 log_text <- build_log(
   script_name = script_name,
@@ -374,7 +382,7 @@ log_text <- build_log(
   sample_name = paste(sample_names, collapse = ", "),
   inputs = c(
     sprintf("Input ASV table: %s", input_table),
-    sprintf("Sequences: %d", nrow(taxa_unit_tdf)),
+    sprintf("Sequences: %d", nrow(input_table_tdf)),
     sprintf("Samples: %d", length(sample_names))
   ),
   params = c(

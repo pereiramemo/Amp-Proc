@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// MODULE 3: taxonomic annotation (SILVA via DADA2 / BLAST)
+// MODULE 3: taxonomic annotation (SILVA via DADA2 NBC / NBC+EM)
 // Input:  tuple(label, sequence-keyed count table)
 //           - label "asv": ASV table from MODULE_2_1_DADA2_PIPELINE
-//           - label "otu": OTU centroid table from MODULE_2_2_3_OTU_TO_SEQTABLE
+//           - label "otu": OTU centroid table from MODULE_2_2_2_VSEARCH_PIPELINE
 // Output: count table with taxonomic annotation
 // Reference databases are mounted via containerOptions (see nextflow.config).
 // Called once per branch via aliased imports (MODULE_3_TAXA_ANNOT_ASV / MODULE_3_TAXA_ANNOT_OTU).
@@ -28,6 +28,7 @@ process MODULE_3_TAXA_ANNOT {
         --table_delim       ${table_delim} \
         --output_dir        3-taxa-annot-${label}-out \
         --method            ${params.taxa_method} \
+        --taxa_unit         ${label} \
         --train_db          ${params.train_db} \
         --ref_db            ${params.ref_db} \
         --nslots            ${task.cpus} \
