@@ -37,10 +37,9 @@ log_error <- function(msg) {
 }
 
 # Assemble the standardized log file following the project CLAUDE.md. Mirrors
-# the format produced by bin/toolbox.py build_log(). The general-info block must
-# not format produced by bin/toolbox.py build_log(). The general-info block must
-# not contain any data statistics (those live in stats/); third-party tool 
-# output — or, for an R script, the session info — is appended in its own 
+# the format produced by bin/utils.py build_log(). The general-info block must
+# not contain any data statistics (those live in stats/); third-party tool
+# output — or, for an R script, the session info — is appended in its own
 # trailing section.
 build_log <- function(script_name, script_desc, sample_name, inputs, params,
                       outputs, command, exit_status, tool_log = "") {

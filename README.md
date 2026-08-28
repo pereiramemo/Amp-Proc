@@ -27,8 +27,8 @@ ASVs) and **VSEARCH** (Operational Taxonomic Units, OTUs).
 │   ├── 2.2.1-vsearch-pipeline.py           # VSEARCH per-sample processing
 │   ├── 2.2.2-vsearch-pipeline.py           # VSEARCH OTU clustering
 │   ├── 3-taxa-annot.R                      # Taxonomic annotation
-│   ├── toolbox.py                          # Shared Python helpers
-│   └── toolbox.R                           # Shared R helpers
+│   ├── utils.py                            # Shared Python helpers
+│   └── utils.R                             # Shared R helpers
 ├── modules/                                # Nextflow process definitions (*.nf)
 ├── docker/                                 # Per-module Dockerfiles + build script
     ├── *.Dockerfile

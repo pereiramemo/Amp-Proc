@@ -11,11 +11,11 @@ suppressMessages(suppressWarnings(library(dada2)))
 suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(suppressWarnings(library(ShortRead)))
 
-# Load toolbox.R (logging + utility functions) from the script's own directory.
+# Load utils.R (logging + utility functions) from the script's own directory.
 # this.path::this.dir() resolves the running script's location across Rscript,
-# source(), and RStudio, so toolbox.R is found regardless of the working dir.
+# source(), and RStudio, so utils.R is found regardless of the working dir.
 suppressMessages(suppressWarnings(library(this.path)))
-source(file.path(this.dir(), "toolbox.R"))
+source(file.path(this.dir(), "utils.R"))
 
 script_name <- "2.1-dada2-pipeline.R"
 script_desc <- "DADA2 ASV inference pipeline (filter, denoise, merge, remove bimeras)." # nolint
@@ -129,13 +129,13 @@ while (i <= length(args)) {
 }
 
 if (is.null(input_dir)) {
-  cat("Error: --input_dir is required\n")
-  show_usage()
+  log_error("--input_dir is required (see --help)")
+  quit(status = 1)
 }
 
 if (is.null(output_dir)) {
-  cat("Error: --output_dir is required\n")
-  show_usage()
+  log_error("--output_dir is required (see --help)")
+  quit(status = 1)
 }
 
 if (!dir.exists(input_dir)) {

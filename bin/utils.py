@@ -7,7 +7,7 @@ the script's own directory to sys.path first:
 
     import os, sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from toolbox import log, log_warn, log_error, derive_sample_name, build_log
+    from utils import log, log_warn, log_error, derive_sample_name, build_log
 
 The log/log_warn/log_error helpers print to the console and also accumulate
 ANSI-free messages that build_log() emits in the Info/Warnings/Errors sections

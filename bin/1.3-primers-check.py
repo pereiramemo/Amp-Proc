@@ -17,9 +17,9 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Data import IUPACData
 
-# Import shared helpers from bin/toolbox.py (sibling module).
+# Import shared helpers from bin/utils.py (sibling module).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from toolbox import log, log_warn, log_error, derive_sample_name, build_log
+from utils import log, log_warn, log_error, derive_sample_name, build_log
 
 # DEV ONLY — comment out before production use
 """

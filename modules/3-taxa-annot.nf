@@ -24,7 +24,7 @@ process MODULE_3_TAXA_ANNOT {
     script:
     """
     3-taxa-annot.R \
-        --input_asv_table   ${seq_table} \
+        --input_table       ${seq_table} \
         --table_delim       ${table_delim} \
         --output_dir        3-taxa-annot-${label}-out \
         --method            ${params.taxa_method} \

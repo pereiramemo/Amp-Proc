@@ -13,8 +13,8 @@ suppressMessages({
   library(this.path)
 })
 
-# Import shared helpers from bin/toolbox.R (sibling module).
-source(file.path(dirname(this.path::this.path()), "toolbox.R"))
+# Import shared helpers from bin/utils.R (sibling module).
+source(file.path(dirname(this.path::this.path()), "utils.R"))
 
 script_name <- "1.2-quality-check.R"
 script_desc <- paste(
